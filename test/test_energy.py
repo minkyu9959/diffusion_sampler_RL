@@ -1,7 +1,6 @@
 from energy import Funnel, ManyWell, GMM25, GMM9
 
 import torch
-import matplotlib.pyplot as plt
 
 
 def test_funnel_sample():
