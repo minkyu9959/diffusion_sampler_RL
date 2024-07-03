@@ -1,10 +1,9 @@
-from typing import Callable, Optional
+from typing import Callable
 
 import numpy as np
 import torch
 
 import matplotlib.pyplot as plt
-from matplotlib.axes import Axes
 
 from .base_energy import HighDimensionalEnergy
 

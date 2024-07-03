@@ -26,7 +26,7 @@ class Funnel(HighDimensionalEnergy):
         dim: int = 10,
         dominant_sigma: float = 3.0,
     ):
-        super().__init__(device=device, dim=10, plotting_bounds=(-10.0, 10.0))
+        super().__init__(device=device, dim=dim, plotting_bounds=(-10.0, 10.0))
         # xlim = 0.01 if nmode == 1 else xlim
 
         self.dominant_distribution = D.Normal(
