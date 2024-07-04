@@ -168,6 +168,9 @@ class GFN(nn.Module):
             s_new = torch.clip(s_new, -self.gfn_clip, self.gfn_clip)
         return s_new, flow.squeeze(-1)
 
+    def generate_init_state(self, batch_size: int):
+        return torch.zeros(batch_size, self.dim, device=self.device)
+
     def get_trajectory_fwd(self, s, exploration_std, log_r, pis=False):
         bsz = s.shape[0]
 
