@@ -3,7 +3,7 @@ import torch
 
 from matplotlib.axes import Axes
 
-from util.plot_util import draw_2D_contour, draw_2D_sample
+from utils.plot_util import draw_2D_contour, draw_2D_sample
 
 
 class BaseEnergy(abc.ABC):

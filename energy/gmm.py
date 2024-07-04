@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
 from .base_energy import BaseEnergy
-from util.plot_util import draw_2D_contour, draw_2D_sample
+from utils.plot_util import draw_2D_contour, draw_2D_sample
 
 
 class GaussianMixture(BaseEnergy):
