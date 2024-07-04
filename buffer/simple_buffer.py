@@ -1,6 +1,7 @@
 from typing import Callable
 
 from .storage import SampleRewardStorage
+from .base_buffer import BaseBuffer
 
 import torch
 
@@ -10,7 +11,7 @@ Here, we implement replay buffer with torch data loader + weighted random sample
 """
 
 
-class SimpleReplayBuffer:
+class SimpleReplayBuffer(BaseBuffer):
     def __init__(
         self,
         buffer_size: int,
