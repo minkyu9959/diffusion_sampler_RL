@@ -1,7 +1,11 @@
 import torch
-from .util import log_mean_exp
+import math
 
 from energy.base_energy import BaseEnergy
+
+
+def log_mean_exp(x, dim=0):
+    return x.logsumexp(dim) - math.log(x.shape[dim])
 
 
 @torch.no_grad()

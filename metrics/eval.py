@@ -6,10 +6,12 @@ from energy.base_energy import BaseEnergy
 from .sample_based_metric import compute_all_distribution_distances
 from .density_based_metric import compute_all_density_based_metrics
 
-from .util import add_prefix_to_dict_key
-
 
 GROUND_TRUTH_SAMPLE = None
+
+
+def add_prefix_to_dict_key(prefix: str, dict: dict) -> dict:
+    return {f"{prefix}/name": dict[name] for name in dict}
 
 
 def compute_all_metrics(
