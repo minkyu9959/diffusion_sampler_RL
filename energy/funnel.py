@@ -18,7 +18,9 @@ class Funnel(HighDimensionalEnergy):
     """
 
     logZ_is_available = True
-    sample_is_available = True
+    _ground_truth_logZ = 0.0
+
+    can_sample = True
 
     def __init__(
         self,
@@ -40,9 +42,6 @@ class Funnel(HighDimensionalEnergy):
         self.cov_eye = torch.eye(
             self.data_ndim - 1, dtype=float, device=self.device
         ).view(1, self.data_ndim - 1, self.data_ndim - 1)
-
-    def ground_truth_logZ(self):
-        return 0.0
 
     def energy(self, x: torch.Tensor):
         return -self.log_prob(x)

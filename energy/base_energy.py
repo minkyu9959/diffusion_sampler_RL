@@ -9,15 +9,17 @@ from util.plot_util import draw_2D_contour, draw_2D_sample
 class BaseEnergy(abc.ABC):
 
     logZ_is_available = False
-    sample_is_available = False
+    can_sample = False
 
     def __init__(self, device, dim):
         self.device = device
         self.data_ndim = dim
 
+    @property
     def ground_truth_logZ(self):
         if not self.logZ_is_available:
             raise Exception("log Z is not available for this energy function")
+        return self._ground_truth_logZ
 
     @abc.abstractmethod
     def energy(self, x: torch.Tensor):

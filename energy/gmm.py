@@ -17,7 +17,9 @@ class GaussianMixture(BaseEnergy):
     """
 
     logZ_is_available = True
-    sample_is_available = True
+    _ground_truth_logZ = 0.0
+
+    can_sample = True
 
     def __init__(
         self,
@@ -43,9 +45,6 @@ class GaussianMixture(BaseEnergy):
         )
         mix = D.Categorical(torch.ones(num_modes, device=self.device))
         self.gmm = MixtureSameFamily(mix, comp)
-
-    def ground_truth_logZ(self) -> float:
-        return 0.0
 
     def energy(self, x: torch.Tensor) -> torch.Tensor:
         return -self.gmm.log_prob(x).flatten()

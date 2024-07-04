@@ -47,7 +47,7 @@ class ManyWell(HighDimensionalEnergy):
     """
 
     logZ_is_available = True
-    sample_is_available = False
+    can_sample = False
 
     def __init__(self, device: str, dim: int = 32):
         super().__init__(device=device, dim=dim, plotting_bounds=(-3.0, 3.0))
@@ -64,6 +64,7 @@ class ManyWell(HighDimensionalEnergy):
         self.logZ_x2 = 0.5 * np.log(2 * np.pi)
         self.logZ_doublewell = np.log(self.Z_x1) + self.logZ_x2
 
+    @property
     def ground_truth_logZ(self):
         return self.n_wells * self.logZ_doublewell
 
