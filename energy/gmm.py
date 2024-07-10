@@ -52,7 +52,7 @@ class GaussianMixture(BaseEnergy):
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         return self.gmm.log_prob(x).flatten()
 
-    def sample(self, batch_size: int) -> torch.Tensor:
+    def _generate_sample(self, batch_size: int) -> torch.Tensor:
         return self.gmm.sample((batch_size,))
 
     def plot_contours(

@@ -47,7 +47,7 @@ class ManyWell(HighDimensionalEnergy):
     """
 
     logZ_is_available = True
-    can_sample = False
+    can_sample = True
 
     def __init__(self, device: str, dim: int = 32):
         super().__init__(device=device, dim=dim, plotting_bounds=(-3.0, 3.0))
@@ -64,9 +64,7 @@ class ManyWell(HighDimensionalEnergy):
         self.logZ_x2 = 0.5 * np.log(2 * np.pi)
         self.logZ_doublewell = np.log(self.Z_x1) + self.logZ_x2
 
-    @property
-    def ground_truth_logZ(self):
-        return self.n_wells * self.logZ_doublewell
+        self._ground_truth_logZ = self.n_wells * self.logZ_doublewell
 
     def energy(self, x: torch.Tensor):
         return -self.log_prob(x)
@@ -110,7 +108,7 @@ class ManyWell(HighDimensionalEnergy):
         x2 = torch.randn_like(x1)
         return torch.stack([x1, x2], dim=1)
 
-    def sample(self, batch_size: int):
+    def _generate_sample(self, batch_size: int):
         return torch.cat(
             [self.sample_doublewell(batch_size) for _ in range(self.n_wells)],
             dim=-1,

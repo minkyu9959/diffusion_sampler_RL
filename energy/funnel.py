@@ -59,7 +59,7 @@ class Funnel(HighDimensionalEnergy):
 
         return log_density_dominant + log_density_other
 
-    def sample(self, batch_size: int) -> torch.Tensor:
+    def _generate_sample(self, batch_size: int) -> torch.Tensor:
         dominant_x = self.dominant_distribution.sample((batch_size,))  # (B,1)
         x_others = self._other_distribution(dominant_x).sample()  # (B, dim-1)
 

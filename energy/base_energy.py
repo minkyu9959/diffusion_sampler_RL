@@ -1,15 +1,35 @@
 import abc
 import torch
 
+from typing import Optional
+
 from matplotlib.axes import Axes
 
 from .utils import draw_2D_contour, draw_2D_sample
 
 
+"""
+------- Guide for new energy function task implementation -------
+
+Make new energy function as subclass as BaseEnergy.
+
+Then implement the followings:
+    1. Set the value of class variable logZ_is_available, can_sample.
+
+    2. _ground_truth_logZ must be set if logZ_is_available.
+
+    3. Implement energy method.
+    
+    4. Implement _generate_sample method if can_sample.
+
+    5. device and dimension must be set (by BaseEnergy constructor).
+"""
+
+
 class BaseEnergy(abc.ABC):
 
-    logZ_is_available = False
-    can_sample = False
+    logZ_is_available: bool = False
+    can_sample: bool = False
 
     def __init__(self, device, dim):
         self.device = device
@@ -32,7 +52,11 @@ class BaseEnergy(abc.ABC):
     def ndim(self):
         return self.data_ndim
 
-    def sample(self, batch_size: int) -> torch.Tensor:
+    @abc.abstractmethod
+    def _generate_sample(self, batch_size: int) -> torch.Tensor:
+        pass
+
+    def sample(self, batch_size: int, device: Optional[str] = None) -> torch.Tensor:
         """
         Generate ground truth sample from energy function.
 
@@ -41,10 +65,17 @@ class BaseEnergy(abc.ABC):
 
         Returns:
             torch.Tensor: generated sample.
-            Caution that returned tensor exists in the same device as energy function.
         """
-        del batch_size
-        raise NotImplementedError
+
+        if not self.can_sample:
+            raise Exception(
+                "Ground truth sample is not available for this energy function"
+            )
+
+        if device is None:
+            device = self.device
+
+        return self._generate_sample(batch_size).to(device=device)
 
     def score(self, x: torch.Tensor):
         with torch.no_grad():
@@ -104,16 +135,19 @@ class HighDimensionalEnergy(BaseEnergy):
     ) -> torch.Tensor:
         """
         Energy function projected on 2d.
-        (i.e., for E: R^d -> R, E compose lift : R^2 -> R^d -> R)
+        (
+            i.e., energy_on_2d = E compose lift: R^2 -> R^d -> R
+            for energy E: R^d -> R
+        )
 
         Args:
             projected_x (torch.Tensor): Batch of 2d points
 
             first_dim (int):
-            The projected poit's first dimension corresponds to n-th dimension on whole space.
+            The projected point's first dimension corresponds to n-th dimension on whole space.
 
             second_dim (int):
-            The projected poit's second dimension corresponds to n-th dimension on whole space.
+            The projected point's second dimension corresponds to n-th dimension on whole space.
 
         Returns:
             torch.Tensor: Batch of energy value
