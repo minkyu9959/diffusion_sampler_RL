@@ -4,6 +4,8 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
+from energy import BaseEnergy
+
 from .architectures import *
 
 logtwopi = math.log(2 * math.pi)
@@ -22,6 +24,7 @@ class GFN(nn.Module):
         hidden_dim: int,
         harmonics_dim: int,
         t_dim: int,
+        energy_function: BaseEnergy,
         log_var_range: float = 4.0,
         t_scale: float = 1.0,
         langevin: bool = False,
@@ -69,6 +72,8 @@ class GFN(nn.Module):
         self.dt = 1.0 / trajectory_length
         self.log_var_range = log_var_range
         self.device = device
+
+        self.energy_function = energy_function
 
         if self.pis_architectures:
 
@@ -340,7 +345,10 @@ class GFN(nn.Module):
 
         return states, logpf, logpb, logf
 
-    def sample(self, batch_size, log_r):
+    def sample(self, batch_size, log_r=None):
+        if log_r is None:
+            log_r = self.energy_function.log_reward
+
         s = torch.zeros(batch_size, self.dim).to(self.device)
         return self.get_trajectory_fwd(s, None, log_r)[0][:, -1]
 

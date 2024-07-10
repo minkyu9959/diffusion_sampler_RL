@@ -1,0 +1,7 @@
+
+# train:
+#   train_with_ground_truth_sample: true
+
+#   local_search:
+#     do_local_search: false
+
