@@ -9,9 +9,7 @@ def log_mean_exp(x, dim=0):
 
 
 @torch.no_grad()
-def log_partition_function(model, log_reward_fn):
-    initial_state = model.generate_init_state()
-
+def log_partition_function(initial_state, model, log_reward_fn):
     states, log_pfs, log_pbs, log_fs = model.get_trajectory_fwd(
         initial_state, None, log_reward_fn
     )
@@ -42,7 +40,8 @@ def compute_all_density_based_metrics(
 ) -> dict:
     metrics = {}
 
-    init_state = model.generate_init_states(eval_data_size)
+    init_state = model.generate_init_state(batch_size=eval_data_size)
+
     (
         _,
         metrics["log_Z"],
