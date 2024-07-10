@@ -247,69 +247,38 @@ def vector_distances(pred, true):
     return mse, me, mae
 
 
-def compute_all_distribution_distances(
-    pred: torch.Tensor, true: Union[torch.Tensor, list]
-):
-    """computes distances between distributions.
-    pred: [batch, times, dims] tensor
-    true: [batch, times, dims] tensor or list[batch[i], dims] of length times
-
-    This handles jagged times as a list of tensors.
+def compute_all_distribution_distances(pred: torch.Tensor, true: torch.Tensor):
     """
-    NAMES = [
-        "1-Wasserstein",
-        "2-Wasserstein",
-        "Linear_MMD",
-        "Poly_MMD",
-        "RBF_MMD",
-        "Mean_MSE",
-        "Mean_L2",
-        "Mean_L1",
-        "Median_MSE",
-        "Median_L2",
-        "Median_L1",
-    ]
-    is_jagged = isinstance(true, list)
-    pred_is_jagged = isinstance(pred, list)
-    dists = []
-    metric_values = []
-    names = []
-    filtered_names = [
-        name for name in NAMES if not is_jagged or not name.endswith("MMD")
-    ]
-    ts = len(pred) if pred_is_jagged else pred.shape[1]
-    for t in np.arange(ts):
-        if pred_is_jagged:
-            a = pred[t]
-        else:
-            a = pred[:, t, :]
-        if is_jagged:
-            b = true[t]
-        else:
-            b = true[:, t, :]
+    computes distances between distributions.
+    pred: [batch, dims] tensor
+    true: [batch, dims] tensor
+    """
 
-        w1 = wasserstein(a, b, power=1)
-        w2 = wasserstein(a, b, power=2)
-        if not pred_is_jagged and not is_jagged:
-            mmd_linear = linear_mmd2(a, b).item()
-            mmd_poly = poly_mmd2(a, b, d=2, alpha=1.0, c=2.0).item()
-            mmd_rbf = mix_rbf_mmd2(a, b, sigma_list=[0.01, 0.1, 1, 10, 100]).item()
-        mean_dists = vector_distances(torch.mean(a, dim=0), torch.mean(b, dim=0))
-        median_dists = vector_distances(
-            torch.median(a, dim=0)[0], torch.median(b, dim=0)[0]
-        )
-        if pred_is_jagged or is_jagged:
-            dists.append((w1, w2, *mean_dists, *median_dists))
-        else:
-            dists.append(
-                (w1, w2, mmd_linear, mmd_poly, mmd_rbf, *mean_dists, *median_dists)
-            )
-        # For multipoint datasets add timepoint specific distances
-        if ts > 1:
-            names.extend([f"t{t + 1}/{name}" for name in filtered_names])
-            metric_values.extend(dists[-1])
+    w1 = wasserstein(pred, true, power=1)
+    w2 = wasserstein(pred, true, power=2)
 
-    metric_values.extend(np.array(dists).mean(axis=0))
-    names.extend(filtered_names)
+    mmd_linear = linear_mmd2(pred, true).item()
+    mmd_poly = poly_mmd2(pred, true, d=2, alpha=1.0, c=2.0).item()
+    mmd_rbf = mix_rbf_mmd2(pred, true, sigma_list=[0.01, 0.1, 1, 10, 100]).item()
 
-    return {name: metric for name, metric in zip(names, metric_values)}
+    mean_mse, mean_l2, mean_l1 = vector_distances(
+        torch.mean(pred, dim=0), torch.mean(true, dim=0)
+    )
+
+    median_mse, median_l2, median_l1 = vector_distances(
+        torch.median(pred, dim=0)[0], torch.median(true, dim=0)[0]
+    )
+
+    return {
+        "1-Wasserstein": w1,
+        "2-Wasserstein": w2,
+        "Linear_MMD": mmd_linear,
+        "Poly_MMD": mmd_poly,
+        "RBF_MMD": mmd_rbf,
+        "Mean_MSE": mean_mse,
+        "Mean_L2": mean_l2,
+        "Mean_L1": mean_l1,
+        "Median_MSE": median_mse,
+        "Median_L2": median_l2,
+        "Median_L1": median_l1,
+    }
