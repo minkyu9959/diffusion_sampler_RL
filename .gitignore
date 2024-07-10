@@ -1,8 +1,9 @@
 __pycache__
 
 outputs
-
 wandb
+results
+results_pis_architectures
 
 .env
 *.png
