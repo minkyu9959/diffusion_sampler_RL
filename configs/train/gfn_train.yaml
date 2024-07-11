@@ -1,5 +1,5 @@
-train_function:
-  _target_: train.gfn.gfn_train.train_GFlowNets
+trainer:
+  _target_: train.gfn.gfn_train.GFNTrainer
 
 epochs: 25000
 batch_size: 300

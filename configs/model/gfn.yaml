@@ -9,7 +9,7 @@ t_dim: 64
 
 t_scale: 1.0
 
-langevin: false
+langevin: true
 langevin_scaling_per_dimension: true
 
 learned_variance: false

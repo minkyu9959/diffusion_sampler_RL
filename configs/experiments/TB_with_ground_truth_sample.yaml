@@ -1,7 +1,12 @@
+# @package _global_
 
-# train:
-#   train_with_ground_truth_sample: true
+train:
+  both_ways: false
+  bwd: true
 
-#   local_search:
-#     do_local_search: false
+  exploratory: false
+  sampling: "energy"
+  mode_bwd: tb
 
+  local_search:
+    do_local_search: false

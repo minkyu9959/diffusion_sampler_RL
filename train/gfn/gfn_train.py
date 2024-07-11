@@ -17,6 +17,7 @@ from buffer import *
 
 from models import GFN
 from train.utils import draw_sample_plot, get_experiment_name
+from train.trainer import BaseTrainer
 
 from .gfn_utils import (
     calculate_subtb_coeff_matrix,
@@ -30,124 +31,102 @@ from .langevin import langevin_dynamics
 from .gfn_losses import *
 
 
-def train_GFlowNets(cfg: DictConfig, model: GFN, energy_function: BaseEnergy):
-    assert type(model) == GFN
+class GFNTrainer(BaseTrainer):
+    def initialize(self):
+        self.coeff_matrix = calculate_subtb_coeff_matrix(
+            self.train_cfg.subtb_lambda, self.model.trajectory_length
+        ).to(self.train_cfg.device)
 
-    train_cfg = cfg.train
+        self.gfn_optimizer = get_GFN_optimizer(self.train_cfg.optimizer, self.model)
 
-    coeff_matrix = calculate_subtb_coeff_matrix(
-        train_cfg.subtb_lambda, model.trajectory_length
-    ).to(cfg.device)
+        self.buffer = get_buffer(self.train_cfg.buffer, self.energy_function)
 
-    gfn_optimizer = get_GFN_optimizer(train_cfg.optimizer, model)
-
-    buffer = get_buffer(train_cfg.buffer, energy_function)
-    local_serach_buffer = get_buffer(train_cfg.buffer, energy_function)
-
-    metrics = dict()
-    model.train()
-    for epoch in trange(train_cfg.epochs + 1):
-        metrics["train/loss"] = train_step(
-            train_cfg,
-            energy_function,
-            model,
-            gfn_optimizer,
-            epoch,
-            buffer,
-            local_serach_buffer,
-            coeff_matrix,
+        self.local_search_buffer = get_buffer(
+            self.train_cfg.buffer, self.energy_function
         )
 
-        if must_eval(cfg, epoch):
-            eval_step(
-                cfg=cfg,
-                epoch=epoch,
-                metrics=metrics,
-                model=model,
-                energy_function=energy_function,
-            )
+    def train_step(self) -> float:
+        self.model.zero_grad()
 
-        if must_save(cfg, epoch):
-            save_model(model)
+        train_cfg: DictConfig = self.train_cfg
 
-    # Final evaluation and save model
-    eval_step(
-        cfg=cfg,
-        epoch=epoch,
-        metrics=metrics,
-        model=model,
-        energy_function=energy_function,
-        is_final=True,
-    )
+        exploration_std = get_exploration_std(
+            epoch=self.current_epoch,
+            exploratory=train_cfg.exploratory,
+            exploration_factor=train_cfg.exploration_factor,
+            exploration_wd=train_cfg.exploration_wd,
+        )
 
-    save_model(model, is_final=True)
+        if train_cfg.both_ways:
+            loss = self._train_from_both_forward_backward_trajectory(exploration_std)
+        elif train_cfg.bwd:
+            loss = self._train_from_only_backward_trajectory(exploration_std)
+        else:
+            loss = self._train_from_only_forward_trajectory(exploration_std)
 
+        loss.backward()
+        self.gfn_optimizer.step()
+        return loss.item()
 
-def train_step(
-    train_cfg: DictConfig,
-    energy: BaseEnergy,
-    gfn_model: GFN,
-    gfn_optimizer: torch.optim.Optimizer,
-    epoch: int,
-    buffer: BaseBuffer,
-    local_search_buffer: BaseBuffer,
-    coeff_matrix: torch.Tensor,
-):
-    gfn_model.zero_grad()
+    def _train_from_both_forward_backward_trajectory(self, exploration_std):
+        gfn_model: GFN = self.model
+        energy_function: BaseEnergy = self.energy_function
+        epoch: int = self.current_epoch
+        cfg: DictConfig = self.train_cfg
 
-    exploration_std = get_exploration_std(
-        epoch=epoch,
-        exploratory=train_cfg.exploratory,
-        exploration_factor=train_cfg.exploration_factor,
-        exploration_wd=train_cfg.exploration_wd,
-    )
-
-    if train_cfg.both_ways:
+        # For even epoch, train with forward trajectory
         if epoch % 2 == 0:
-            if train_cfg.sampling == "buffer":
+            if self.train_cfg.sampling == "buffer":
                 loss, states, _, _, log_r = fwd_train_step(
-                    train_cfg,
-                    energy,
+                    self.train_cfg,
+                    energy_function,
                     gfn_model,
                     exploration_std,
-                    coeff_matrix,
+                    self.coeff_matrix,
                     return_exp=True,
                 )
-                buffer.add(states[:, -1], log_r)
+                self.buffer.add(states[:, -1], log_r)
             else:
                 loss = fwd_train_step(
-                    train_cfg, energy, gfn_model, exploration_std, coeff_matrix
+                    self.train_cfg,
+                    energy_function,
+                    gfn_model,
+                    exploration_std,
+                    self.coeff_matrix,
                 )
+
+        # For odd epoch, train with backward trajectory
         else:
             loss = bwd_train_step(
-                train_cfg,
-                energy,
+                cfg,
+                energy_function,
                 gfn_model,
-                buffer,
-                local_search_buffer,
+                self.buffer,
+                self.local_search_buffer,
                 exploration_std,
                 it=epoch,
             )
+        return loss
 
-    elif train_cfg.bwd:
-        loss = bwd_train_step(
-            train_cfg,
-            energy,
-            gfn_model,
-            buffer,
-            local_search_buffer,
+    def _train_from_only_backward_trajectory(self, exploration_std):
+        return bwd_train_step(
+            self.train_cfg,
+            self.energy_function,
+            self.model,
+            self.buffer,
+            self.local_search_buffer,
             exploration_std,
-            it=epoch,
+            it=self.current_epoch,
         )
 
-    else:
-        loss = fwd_train_step(
-            train_cfg, energy, gfn_model, exploration_std, coeff_matrix
+    def _train_from_only_forward_trajectory(self, exploration_std):
+        return fwd_train_step(
+            self.train_cfg,
+            self.energy_function,
+            self.model,
+            exploration_std,
+            self.coeff_matrix,
         )
-
-    loss.backward()
-    gfn_optimizer.step()
-    return loss.item()
 
 
 def fwd_train_step(
@@ -175,7 +154,7 @@ def fwd_train_step(
 
 def bwd_train_step(
     train_cfg: DictConfig,
-    energy,
+    energy: BaseEnergy,
     gfn_model,
     buffer,
     local_search_buffer,
@@ -209,66 +188,3 @@ def bwd_train_step(
         exploration_std=exploration_std,
     )
     return loss
-
-
-def eval_step(
-    cfg: DictConfig,
-    epoch: int,
-    metrics: dict,
-    model: GFN,
-    energy_function: BaseEnergy,
-    is_final: bool = False,
-):
-
-    plot_filename_prefix = get_experiment_name()
-    plot_sample_size = cfg.eval.plot_sample_size
-    eval_data_size = (
-        cfg.eval.final_eval_data_size if is_final else cfg.eval.eval_data_size
-    )
-
-    current_metrics = compute_all_metrics(
-        model=model,
-        energy_function=energy_function,
-        eval_data_size=eval_data_size,
-        do_resample=is_final,
-    )
-
-    if is_final:
-        add_prefix_to_dict_key("final_eval/", current_metrics)
-    else:
-        add_prefix_to_dict_key("eval/", current_metrics)
-
-    metrics.update(current_metrics)
-
-    if "tb-avg" in cfg.train.mode_fwd or "tb-avg" in cfg.train.mode_bwd:
-        del metrics["eval/log_Z_learned"]
-
-    metrics.update(
-        draw_sample_plot(
-            energy_function,
-            model,
-            plot_filename_prefix,
-            plot_sample_size,
-        )
-    )
-
-    plt.close("all")
-
-    if is_final:
-        wandb.log(metrics)
-    else:
-        wandb.log(metrics, step=epoch)
-
-
-def must_save(cfg: DictConfig, epoch: int = 0):
-    return epoch % cfg.eval.save_model_every_n_epoch == 0
-
-
-def must_eval(cfg: DictConfig, epoch: int = 0):
-    return epoch % cfg.eval.eval_every_n_epoch == 0
-
-
-def save_model(model: GFN, is_final: bool = False):
-    name = get_experiment_name()
-    final = "_final" if is_final else ""
-    torch.save(model.state_dict(), f"{name}model{final}.pt")

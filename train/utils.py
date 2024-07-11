@@ -28,17 +28,21 @@ def set_seed(seed):
 
 
 def get_energy_function(cfg: DictConfig) -> BaseEnergy:
+
     energy_function = instantiate(cfg.energy, device=cfg.device)
+
     return energy_function
 
 
 def get_model(cfg: DictConfig, energy_function: BaseEnergy) -> torch.nn.Module:
+
     model = instantiate(
         cfg.model,
         dim=energy_function.data_ndim,
         device=cfg.device,
         energy_function=energy_function,
     )
+
     return model
 
 
@@ -54,14 +58,14 @@ def add_extra_config_and_set_read_only(cfg: DictConfig):
     if cfg.train.both_ways and cfg.train.bwd:
         cfg.train.bwd = False
 
-    if cfg.train.local_search:
+    if cfg.train.local_search.do_local_search:
         cfg.train.both_ways = True
 
     # From now, config file cannot be modified.
-    # OmegaConf.set_readonly(cfg, True)
+    OmegaConf.set_readonly(cfg, True)
 
 
-def get_name_from_config(cfg: DictConfig):
+def set_name_from_config(cfg: DictConfig):
     name = ""
     if cfg.model.langevin:
         name = "langevin_"
@@ -113,7 +117,7 @@ def get_name_from_config(cfg: DictConfig):
         results = "results"
 
     name = f"{results}/{name}gfn/{ways}/T_{cfg.model.trajectory_length}/tscale_{cfg.model.t_scale}/lvr_{cfg.model.log_var_range}/"
-    # name = f"{results}/{cfg.energy}/{name}gfn/{ways}/T_{cfg.T}/tscale_{cfg.t_scale}/lvr_{cfg.log_var_range}/"
+    name = f"{results}/{cfg.energy._target_}/{name}gfn/{ways}/T_{cfg.model.trajectory_length}/tscale_{cfg.model.t_scale}/lvr_{cfg.model.log_var_range}/"
 
     name = f"{name}/seed_{cfg.seed}/"
 
@@ -141,6 +145,20 @@ def draw_sample_plot(
     plot_prefix: str,
     plot_sample_size: int,
 ) -> dict:
+    """
+    Generate sample from model and plot it using energy function's make_plot method.
+    If energy function does not have make_plot method, return empty dict.
+
+    Args:
+        energy (BaseEnergy): energy function which model learn to sample from
+        model (torch.nn.Module): learned sampler model
+        plot_prefix (str): plot file prefix (directory path and file name prefix)
+        plot_sample_size (int): number of sample to plot
+
+    Returns:
+        dict: dictionary that has wandb Image objects as value
+    """
+
     if not hasattr(energy, "make_plot"):
         return {}
 
@@ -153,3 +171,8 @@ def draw_sample_plot(
     return {
         "visualiation/plot": wandb.Image(fig_to_image(fig)),
     }
+
+
+def save_model(model: torch.nn.Module, is_final: bool = False):
+    final = "_final" if is_final else ""
+    torch.save(model.state_dict(), f"{NAME}model{final}.pt")

@@ -6,13 +6,18 @@ defaults:
   - energy: manywell
   - model: gfn
   - train: gfn_train
-  # - experiments: TB_with_ground_truth_sample
   - _self_
+  - experiments: TB_with_ground_truth_sample
 
 train:
-  train_function:
+  trainer:
     _recursive_: false
+  device: ${device}
 
+model:
+  device: ${device}
+
+energy:
   device: ${device}
 
 eval:
@@ -22,3 +27,6 @@ eval:
   eval_data_size: 2000
   final_eval_data_size: 2000
   plot_sample_size: 2000
+
+wandb:
+  project: "GFN Energy"

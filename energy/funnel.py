@@ -52,10 +52,10 @@ class Funnel(HighDimensionalEnergy):
 
         log_sigma = 0.5 * x[:, 0:1]
         sigma_square = torch.exp(x[:, 0:1])
-        neg_log_density_other = (
+        minus_log_density_other = (
             0.5 * np.log(2 * np.pi) + log_sigma + 0.5 * x[:, 1:] ** 2 / sigma_square
         )
-        log_density_other = torch.sum(-neg_log_density_other, dim=-1)
+        log_density_other = torch.sum(-minus_log_density_other, dim=-1)
 
         return log_density_dominant + log_density_other
 

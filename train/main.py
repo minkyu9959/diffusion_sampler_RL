@@ -3,7 +3,7 @@ import os
 import torch
 
 import hydra
-from hydra.utils import call
+from hydra.utils import instantiate
 
 from omegaconf import DictConfig, OmegaConf
 
@@ -14,23 +14,29 @@ from train.utils import (
     add_extra_config_and_set_read_only,
     get_energy_function,
     get_model,
-    get_name_from_config,
+    set_name_from_config,
 )
 
 from energy import BaseEnergy
+from train.trainer import BaseTrainer
 
 
 def train(cfg: DictConfig, model: torch.nn.Module, energy_function: BaseEnergy):
-    # model logging
+    # TODO: model logging
 
-    # energy_funciton logging
+    # TODO: energy_funciton logging
 
-    call(
-        cfg.train.train_function,
-        cfg=cfg,
+    trainer = instantiate(
+        cfg.train.trainer,
         model=model,
         energy_function=energy_function,
+        train_cfg=cfg.train,
+        eval_cfg=cfg.eval,
     )
+
+    trainer.initialize()
+
+    trainer.train()
 
 
 @hydra.main(version_base="1.3", config_path="../configs", config_name="main.yaml")
@@ -49,13 +55,18 @@ def main(cfg: DictConfig) -> None:
 
     model: torch.nn.Module = get_model(cfg, energy_function).to(cfg.device)
 
-    name = get_name_from_config(cfg)
+    name = set_name_from_config(cfg)
     if not os.path.exists(name):
         os.makedirs(name)
 
+    # Wandb logging only cannot accept OmegaConf object.
+    # Thus, we convert it to python dictionary.
     cfg_dict = OmegaConf.to_container(cfg)
-    wandb.init(project="GFN Energy", entity="dywoo1247", config=cfg_dict, name=name)
+    wandb.init(
+        project=cfg.wandb.project, entity="dywoo1247", config=cfg_dict, name=name
+    )
 
+    # Train strats here.
     train(cfg, model, energy_function)
 
     wandb.finish()
