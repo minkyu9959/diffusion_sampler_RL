@@ -1,1 +1,3 @@
 _target_: energy.gmm.GMM40
+
+dim: 2

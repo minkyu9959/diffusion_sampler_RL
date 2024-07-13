@@ -1,1 +1,3 @@
 _target_: energy.funnel.Funnel
+
+dim: 10

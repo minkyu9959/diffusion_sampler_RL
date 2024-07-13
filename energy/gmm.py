@@ -24,11 +24,13 @@ class GaussianMixture(BaseEnergy):
     def __init__(
         self,
         device: str,
+        dim: int,
         mode_list: torch.Tensor,
         scale: float = 1.0,
         plotting_bounds: tuple = (-10.0, 10.0),
     ):
-        super().__init__(device=device, dim=2)
+        assert dim == 2
+        super().__init__(device=device, dim=dim)
 
         self.plotting_bounds = plotting_bounds
 
@@ -47,10 +49,10 @@ class GaussianMixture(BaseEnergy):
         self.gmm = MixtureSameFamily(mix, comp)
 
     def energy(self, x: torch.Tensor) -> torch.Tensor:
-        return -self.gmm.log_prob(x).flatten()
+        return -self.gmm.log_prob(x)
 
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
-        return self.gmm.log_prob(x).flatten()
+        return self.gmm.log_prob(x)
 
     def _generate_sample(self, batch_size: int) -> torch.Tensor:
         return self.gmm.sample((batch_size,))
@@ -114,7 +116,7 @@ class GaussianMixture(BaseEnergy):
 
 
 class GMM9(GaussianMixture):
-    def __init__(self, device: str, scale: float = 0.5477222):
+    def __init__(self, device: str, dim: int, scale: float = 0.5477222):
 
         mode_list = torch.tensor(
             [(a, b) for a in [-5.0, 0.0, 5.0] for b in [-5.0, 0.0, 5.0]],
@@ -122,12 +124,16 @@ class GMM9(GaussianMixture):
         )
 
         super().__init__(
-            device=device, mode_list=mode_list, scale=scale, plotting_bounds=(-8.0, 8.0)
+            device=device,
+            mode_list=mode_list,
+            dim=dim,
+            scale=scale,
+            plotting_bounds=(-8.0, 8.0),
         )
 
 
 class GMM25(GaussianMixture):
-    def __init__(self, device: str, scale: float = 0.3):
+    def __init__(self, device: str, dim: int, scale: float = 0.3):
 
         mode_list = torch.tensor(
             [
@@ -141,6 +147,7 @@ class GMM25(GaussianMixture):
         super().__init__(
             device=device,
             mode_list=mode_list,
+            dim=dim,
             scale=scale,
             plotting_bounds=(-15.0, 15.0),
         )

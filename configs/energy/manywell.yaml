@@ -1,1 +1,3 @@
 _target_: energy.many_well.ManyWell
+
+dim: 32
