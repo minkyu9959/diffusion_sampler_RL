@@ -8,11 +8,10 @@ subtb_lambda: 2
 
 both_ways: true
 mode_fwd: tb
-mode_bwd: tb
-
 bwd: true
-exploratory: true
+mode_bwd: tb
 sampling: "buffer"
+exploratory: true
 exploration_factor: 0.1
 exploration_wd: true
 

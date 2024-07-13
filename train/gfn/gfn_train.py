@@ -5,18 +5,12 @@ Train code for GFN with local search buffer + Langevin parametrization
 
 import torch
 
-import matplotlib.pyplot as plt
-from tqdm import trange
-import wandb
-
 from omegaconf import DictConfig
 
 from energy import BaseEnergy
-from metrics import compute_all_metrics, add_prefix_to_dict_key
 from buffer import *
 
 from models import GFN
-from train.utils import draw_sample_plot, get_experiment_name
 from train.trainer import BaseTrainer
 
 from .gfn_utils import (
@@ -69,18 +63,15 @@ class GFNTrainer(BaseTrainer):
         return loss.item()
 
     def _train_from_both_forward_backward_trajectory(self, exploration_std):
-        gfn_model: GFN = self.model
-        energy_function: BaseEnergy = self.energy_function
         epoch: int = self.current_epoch
-        cfg: DictConfig = self.train_cfg
 
         # For even epoch, train with forward trajectory
         if epoch % 2 == 0:
             if self.train_cfg.sampling == "buffer":
                 loss, states, _, _, log_r = fwd_train_step(
                     self.train_cfg,
-                    energy_function,
-                    gfn_model,
+                    self.energy_function,
+                    self.model,
                     exploration_std,
                     self.coeff_matrix,
                     return_exp=True,
@@ -89,8 +80,8 @@ class GFNTrainer(BaseTrainer):
             else:
                 loss = fwd_train_step(
                     self.train_cfg,
-                    energy_function,
-                    gfn_model,
+                    self.energy_function,
+                    self.model,
                     exploration_std,
                     self.coeff_matrix,
                 )
@@ -98,9 +89,9 @@ class GFNTrainer(BaseTrainer):
         # For odd epoch, train with backward trajectory
         else:
             loss = bwd_train_step(
-                cfg,
-                energy_function,
-                gfn_model,
+                self.train_cfg,
+                self.energy_function,
+                self.model,
                 self.buffer,
                 self.local_search_buffer,
                 exploration_std,

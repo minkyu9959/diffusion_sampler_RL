@@ -66,10 +66,45 @@ def db(initial_state, gfn, log_reward_fn, exploration_std=None, return_exp=False
         log_fs[:, -1] = log_reward_fn(states[:, -1]).detach()
 
     loss = 0.5 * ((log_pfs + log_fs[:, :-1] - log_pbs - log_fs[:, 1:]) ** 2).sum(-1)
+
     if return_exp:
         return loss.mean(), states, log_pfs, log_pbs, log_fs[:, -1]
     else:
+        return loss.mean()
 
+
+def annealed_db(
+    initial_state, gfn, log_reward_fn, exploration_std=None, return_exp=False
+):
+    # Generate forward trajectory.
+    states, log_pfs, log_pbs, _ = gfn.get_trajectory_fwd(
+        initial_state, exploration_std, log_reward_fn
+    )
+
+    logZ_ratio = gfn.get_logZ_ratio()
+
+    def interpolated_log_reward_fn(states):
+        time = torch.linspace(0, 1, gfn.trajectory_length + 1).to(gfn.device)
+
+        # Prior is standard normal gaussian.
+        prior_log_reward = -0.5 * (
+            torch.log(torch.tensor(2 * torch.pi, device=gfn.device))
+            - (states**2).sum(-1)
+        )
+        log_reward = log_reward_fn(states)
+
+        return (1 - time) * prior_log_reward + time * log_reward
+
+    with torch.no_grad():
+        log_r_t = interpolated_log_reward_fn(states)
+
+    loss = 0.5 * (
+        (log_pfs + logZ_ratio + log_r_t[:, :-1] - log_pbs - log_r_t[:, 1:]) ** 2
+    ).sum(-1)
+
+    if return_exp:
+        return loss.mean(), states, log_pfs, log_pbs, log_r_t
+    else:
         return loss.mean()
 
 

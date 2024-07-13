@@ -2,7 +2,7 @@ import torch
 
 import numpy as np
 
-from models import GFN
+from models import GFN, AnnealedGFN
 from buffer import *
 from energy import BaseEnergy
 
@@ -30,7 +30,7 @@ def calculate_subtb_coeff_matrix(lamda, N):
 
 def get_GFN_optimizer(
     optimizer_cfg: DictConfig,
-    gfn_model: GFN,
+    gfn_model: torch.nn.Module,
 ):
     param_groups = [
         {"params": gfn_model.t_model.parameters()},
@@ -43,6 +43,8 @@ def get_GFN_optimizer(
         param_groups += [
             {"params": gfn_model.flow_model.parameters(), "lr": optimizer_cfg.lr_flow}
         ]
+    elif type(gfn_model) == AnnealedGFN:
+        param_groups += [{"params": gfn_model.logZ_ratio, "lr": optimizer_cfg.lr_flow}]
     else:
         param_groups += [
             {"params": [gfn_model.flow_model], "lr": optimizer_cfg.lr_flow}
@@ -102,6 +104,8 @@ def get_gfn_forward_loss(
         loss = db(init_state, gfn_model, log_reward, exploration_std)
     elif mode == "subtb":
         loss = subtb(init_state, gfn_model, log_reward, coeff_matrix, exploration_std)
+    elif mode == "annealed-db":
+        loss = annealed_db(init_state, gfn_model, log_reward, exploration_std)
     return loss
 
 

@@ -1,0 +1,16 @@
+# @package _global_
+
+defaults:
+  - override /energy: 9gmm
+
+train:
+  both_ways: false
+  bwd: false
+  # Train from only forward trajectory.
+
+  exploratory: false
+  sampling: "energy"
+  mode_bwd: tb
+
+  local_search:
+    do_local_search: false
