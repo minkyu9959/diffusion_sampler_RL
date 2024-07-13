@@ -38,8 +38,7 @@ def get_model(cfg: DictConfig, energy_function: BaseEnergy) -> torch.nn.Module:
 
     model = instantiate(
         cfg.model,
-        dim=energy_function.data_ndim,
-        device=cfg.device,
+        device=torch.device(cfg.device),
         energy_function=energy_function,
     )
 

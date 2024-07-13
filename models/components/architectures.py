@@ -88,14 +88,14 @@ class FourierMLP(nn.Module):
 
 
 class TimeEncoding(nn.Module):
-    def __init__(self, harmonics_dim: int, dim: int, hidden_dim: int = 64):
+    def __init__(self, harmonics_dim: int, t_emb_dim: int, hidden_dim: int = 64):
         super(TimeEncoding, self).__init__()
 
         pe = torch.arange(1, harmonics_dim + 1).float().unsqueeze(0) * 2 * math.pi
         self.t_model = nn.Sequential(
             nn.Linear(2 * harmonics_dim, hidden_dim),
             nn.GELU(),
-            nn.Linear(hidden_dim, dim),
+            nn.Linear(hidden_dim, t_emb_dim),
             nn.GELU(),
         )
         self.register_buffer("pe", pe)
@@ -133,19 +133,16 @@ class JointPolicy(nn.Module):
         s_emb_dim: int,
         t_dim: int,
         hidden_dim: int = 64,
-        out_dim: int = None,
         zero_init: bool = False,
     ):
         super(JointPolicy, self).__init__()
-        if out_dim is None:
-            out_dim = 2 * s_dim
 
         self.model = nn.Sequential(
             nn.Linear(s_emb_dim + t_dim, hidden_dim),
             nn.GELU(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.GELU(),
-            nn.Linear(hidden_dim, out_dim),
+            nn.Linear(hidden_dim, 2 * s_dim),
         )
 
         if zero_init:
@@ -202,7 +199,7 @@ class LangevinScalingModel(nn.Module):
 
 
 class TimeEncodingPIS(nn.Module):
-    def __init__(self, harmonics_dim: int, dim: int, hidden_dim: int = 64):
+    def __init__(self, harmonics_dim: int, t_emb_dim: int, hidden_dim: int = 64):
         super(TimeEncodingPIS, self).__init__()
 
         pe = torch.linspace(start=0.1, end=100, steps=harmonics_dim)[None]
@@ -212,7 +209,7 @@ class TimeEncodingPIS(nn.Module):
         self.t_model = nn.Sequential(
             nn.Linear(2 * harmonics_dim, hidden_dim),
             nn.GELU(),
-            nn.Linear(hidden_dim, dim),
+            nn.Linear(hidden_dim, t_emb_dim),
         )
         self.register_buffer("pe", pe)
 
@@ -228,7 +225,7 @@ class TimeEncodingPIS(nn.Module):
 
 
 class StateEncodingPIS(nn.Module):
-    def __init__(self, s_dim: int, hidden_dim: int = 64, s_emb_dim: int = 64):
+    def __init__(self, s_dim: int, s_emb_dim: int = 64):
         super(StateEncodingPIS, self).__init__()
 
         self.x_model = nn.Linear(s_dim, s_emb_dim)
@@ -244,13 +241,10 @@ class JointPolicyPIS(nn.Module):
         s_emb_dim: int,
         t_dim: int,
         hidden_dim: int = 64,
-        out_dim: int = None,
         num_layers: int = 2,
         zero_init: bool = False,
     ):
         super(JointPolicyPIS, self).__init__()
-        if out_dim is None:
-            out_dim = 2 * s_dim
 
         assert s_emb_dim == t_dim, print(
             "Dimensionality of state embedding and time embedding should be the same!"
@@ -262,7 +256,7 @@ class JointPolicyPIS(nn.Module):
                 nn.Sequential(nn.Linear(hidden_dim, hidden_dim), nn.GELU())
                 for _ in range(num_layers)
             ],
-            nn.Linear(hidden_dim, out_dim),
+            nn.Linear(hidden_dim, 2 * s_dim),
         )
 
         if zero_init:
@@ -276,7 +270,6 @@ class JointPolicyPIS(nn.Module):
 class FlowModelPIS(nn.Module):
     def __init__(
         self,
-        s_dim: int,
         s_emb_dim: int,
         t_dim: int,
         hidden_dim: int = 64,

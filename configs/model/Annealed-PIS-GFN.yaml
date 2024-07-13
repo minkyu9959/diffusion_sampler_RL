@@ -1,4 +1,4 @@
-_target_: models.gfn.GFN
+_target_: models.annealed_gfn.AnnealedGFN
 
 trajectory_length: 100
 
@@ -12,7 +12,7 @@ t_scale: 1.0
 langevin: true
 langevin_scaling_per_dimension: true
 
-learned_variance: false
+learned_variance: true
 log_var_range: 4.0
 
 learn_pb: false

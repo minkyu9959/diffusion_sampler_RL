@@ -1,0 +1,13 @@
+_target_: models.components.architectures.JointPolicy
+
+s_dim: ???
+
+s_emb_dim: 64
+
+t_dim: 64
+
+hidden_dim: 64
+
+num_layers: 2
+
+zero_init: true

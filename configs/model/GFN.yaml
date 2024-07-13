@@ -1,0 +1,47 @@
+_target_: models.gfn.GFN
+
+defaults:
+  # From components directory, get StateEncoding-PIS.yaml,
+  # and set its config group as state_encoder.
+  - components@state_encoder: StateEncoding-PIS
+
+  - components@time_encoder: TimeEncoding-PIS
+
+  - components@forward_model: JointPolicy-PIS
+
+  - components@backward_model: JointPolicy-PIS
+
+  - components@flow_model: FlowModel-PIS
+
+  - components@langevin_scaler: LangevinScaling-PIS
+
+forward_model:
+  s_dim: ${energy.dim}
+
+backward_model:
+  s_dim: ${energy.dim}
+
+state_model:
+  s_dim: ${energy.dim}
+
+# If yout want to scale gradient of energy dimension-wise,
+# you can set out_dim to ${energy.dim}.
+langevin_scaler:
+  out_dim: ${energy.dim}
+
+trajectory_length: 100
+
+t_scale: 1.0
+learned_variance: false
+log_var_range: 4.0
+learn_pb: false
+
+pb_scale_range: 0.1
+
+partial_energy: false
+
+clipping: true
+lgv_clip: 1e2
+gfn_clip: 1e4
+
+conditional_flow_model: false

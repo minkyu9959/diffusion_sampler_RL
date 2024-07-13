@@ -1,0 +1,7 @@
+_target_: models.components.architectures.TimeEncoding
+
+harmonics_dim: 64
+
+t_emb_dim: 64
+
+hidden_dim: 64
