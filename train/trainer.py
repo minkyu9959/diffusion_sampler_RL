@@ -72,7 +72,6 @@ class BaseTrainer(abc.ABC):
 
         metrics = compute_all_metrics(
             model=self.model,
-            energy_function=self.energy_function,
             eval_data_size=eval_data_size,
             do_resample=self.train_end,
             # At the end of training, we resample the evaluation data.

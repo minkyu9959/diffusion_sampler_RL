@@ -247,6 +247,7 @@ def vector_distances(pred, true):
     return mse, me, mae
 
 
+@torch.no_grad()
 def compute_all_distribution_distances(pred: torch.Tensor, true: torch.Tensor):
     """
     computes distances between distributions.
