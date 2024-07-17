@@ -62,8 +62,6 @@ class BaseTrainer(abc.ABC):
             metric: a dictionary containing metric value
         """
 
-        plot_filename_prefix = get_experiment_name()
-        plot_sample_size = self.eval_cfg.plot_sample_size
         eval_data_size = (
             self.eval_cfg.final_eval_data_size
             if self.train_end
@@ -77,15 +75,13 @@ class BaseTrainer(abc.ABC):
             # At the end of training, we resample the evaluation data.
         )
 
-        # TODO: Replace them with filter code in compute_all_metircs
-        if "tb-avg" in self.train_cfg.mode_fwd or "tb-avg" in self.train_cfg.mode_bwd:
-            del metrics["eval/log_Z_learned"]
-
         if self.train_end:
             add_prefix_to_dict_key("final_eval/", metrics)
         else:
             add_prefix_to_dict_key("eval/", metrics)
 
+        plot_filename_prefix = get_experiment_name()
+        plot_sample_size = self.eval_cfg.plot_sample_size
         metrics.update(
             draw_sample_plot(
                 energy=self.energy_function,

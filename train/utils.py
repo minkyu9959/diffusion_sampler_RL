@@ -50,15 +50,12 @@ def get_logger(cfg: DictConfig):
     return logger
 
 
-def add_extra_config_and_set_read_only(cfg: DictConfig):
-    if cfg.model.pis_architectures:
-        cfg.model.zero_init = True
-
+def check_config_and_set_read_only(cfg: DictConfig):
     if cfg.train.both_ways and cfg.train.bwd:
-        cfg.train.bwd = False
+        raise ValueError("Cannot set both both_ways and bwd to True.")
 
-    if cfg.train.local_search.do_local_search:
-        cfg.train.both_ways = True
+    if "local_search" in cfg.train and (not cfg.train.bwd and not cfg.train.both_ways):
+        raise ValueError("Local search cannot be used with foward trajectory training.")
 
     # From now, config file cannot be modified.
     OmegaConf.set_readonly(cfg, True)
@@ -66,9 +63,9 @@ def add_extra_config_and_set_read_only(cfg: DictConfig):
 
 def set_name_from_config(cfg: DictConfig):
     name = ""
-    if cfg.model.langevin:
+    if "langevin_scaler" in cfg.model:
         name = "langevin_"
-        if cfg.model.langevin_scaling_per_dimension:
+        if cfg.model.langevin_scaler.out_dim == cfg.energy.dim:
             name += "scaling_per_dimension_"
 
     if cfg.train.exploratory and (cfg.train.exploration_factor is not None):
@@ -77,7 +74,7 @@ def set_name_from_config(cfg: DictConfig):
         else:
             name = f"exploration_{cfg.train.exploration_factor}_{name}_"
 
-    if cfg.model.learn_pb:
+    if "backward_model" in cfg.model:
         name = f"{name}learn_pb_scale_range_{cfg.model.pb_scale_range}_"
 
     if cfg.model.clipping:
@@ -85,8 +82,6 @@ def set_name_from_config(cfg: DictConfig):
 
     if cfg.train.mode_fwd == "subtb":
         mode_fwd = f"subtb_subtb_lambda_{cfg.train.subtb_lambda}"
-        if cfg.model.partial_energy:
-            mode_fwd = f"{mode_fwd}_{cfg.model.partial_energy}"
     else:
         mode_fwd = cfg.train.mode_fwd
 
@@ -97,7 +92,7 @@ def set_name_from_config(cfg: DictConfig):
     else:
         ways = f"fwd/fwd_{mode_fwd}"
 
-    if cfg.train.local_search.do_local_search:
+    if "local_search" in cfg.train and cfg.train.local_search is not None:
         local_serach_cfg = cfg.train.local_search
         buffer_cfg = cfg.train.buffer
 
@@ -110,13 +105,8 @@ def set_name_from_config(cfg: DictConfig):
         local_search += f"prioritized_{buffer_cfg.prioritized}"
         ways = f"{ways}/{local_search}"
 
-    if cfg.model.pis_architectures:
-        results = "results_pis_architectures"
-    else:
-        results = "results"
-
-    name = f"{results}/{name}gfn/{ways}/T_{cfg.model.trajectory_length}/tscale_{cfg.model.t_scale}/lvr_{cfg.model.log_var_range}/"
-    name = f"{results}/{cfg.energy._target_}/{name}gfn/{ways}/T_{cfg.model.trajectory_length}/tscale_{cfg.model.t_scale}/lvr_{cfg.model.log_var_range}/"
+    name = f"results/{name}gfn/{ways}/T_{cfg.model.trajectory_length}/tscale_{cfg.model.t_scale}/lvr_{cfg.model.log_var_range}/"
+    name = f"results/{cfg.energy._target_}/{name}gfn/{ways}/T_{cfg.model.trajectory_length}/tscale_{cfg.model.t_scale}/lvr_{cfg.model.log_var_range}/"
 
     name = f"{name}/seed_{cfg.seed}/"
 
