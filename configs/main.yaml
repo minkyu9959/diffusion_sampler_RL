@@ -9,7 +9,7 @@ defaults:
   - _self_
 
   # Experiments config file can override the default option.
-  - experiment: TB_with_ground_truth_sample
+  # - experiment: TB_with_ground_truth_sample
 
 train:
   trainer:

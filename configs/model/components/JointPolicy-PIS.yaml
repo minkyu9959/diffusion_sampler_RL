@@ -1,4 +1,4 @@
-_target_: models.components.architectures.JointPolicy
+_target_: models.components.architectures.JointPolicyPIS
 
 s_dim: ???
 

@@ -8,7 +8,7 @@ subtb_lambda: 2
 
 both_ways: true
 mode_fwd: tb
-bwd: true
+bwd: false
 mode_bwd: tb
 sampling: "buffer"
 exploratory: true
@@ -32,7 +32,6 @@ buffer:
   beta: 1.0
 
 local_search:
-  do_local_search: true
   max_iter_ls: 200
   burn_in: 100
   ls_cycle: 100
