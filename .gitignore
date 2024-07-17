@@ -6,4 +6,5 @@ results
 results_pis_architectures
 
 .env
+.vscode
 *.png
