@@ -123,7 +123,7 @@ class HighDimensionalEnergy(BaseEnergy):
     ) -> torch.Tensor:
 
         # make zero tensor
-        x = torch.zeros((projected_x_2d.shape[0], self.data_ndim)).to(self.device)
+        x = torch.zeros((projected_x_2d.shape[0], self.data_ndim), device=self.device)
 
         x[:, first_dim] = projected_x_2d[:, 0]
         x[:, second_dim] = projected_x_2d[:, 1]

@@ -1,11 +1,13 @@
-from typing import Callable
+from typing import Callable, Optional
 import itertools
 
 import torch
 from matplotlib.axes import Axes
 
 
-def get_points_on_2D_grid(bounds: tuple, grid_width_n_points: int):
+def get_points_on_2D_grid(
+    bounds: tuple, grid_width_n_points: int, device: Optional[str] = "cpu"
+):
     grid_lower_lim, grid_upper_lim = bounds
 
     x = torch.linspace(
@@ -59,8 +61,8 @@ def draw_2D_contour(
     """
 
     points = get_points_on_2D_grid(
-        bounds=bounds, grid_width_n_points=grid_width_n_points
-    ).to(device)
+        bounds=bounds, grid_width_n_points=grid_width_n_points, device=device
+    )
 
     assert points.ndim == 2 and points.shape[1] == 2
 
