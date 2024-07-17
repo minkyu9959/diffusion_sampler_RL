@@ -1,21 +1,11 @@
-"""
-Annealed continuous GFlowNets
-
-Returns:
-    _type_: _description_
-"""
-
 import torch
 import math
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
+from models.components.architectures import *
 from energy import BaseEnergy
-
-from .components.architectures import *
-
-logtwopi = math.log(2 * math.pi)
 
 
 def gaussian_params(tensor):
@@ -23,7 +13,10 @@ def gaussian_params(tensor):
     return mean, logvar
 
 
-class AnnealedGFN(nn.Module):
+logtwopi = math.log(2 * math.pi)
+
+
+class GFN(nn.Module):
     def __init__(
         self,
         dim: int,
@@ -51,13 +44,8 @@ class AnnealedGFN(nn.Module):
         zero_init: bool = False,
         device=torch.device("cuda"),
     ):
-        super(AnnealedGFN, self).__init__()
-
-        # These three are dummy variables.
-        self.partial_energy = partial_energy
-        self.conditional_flow_model = conditional_flow_model
-        self.learn_pb = learn_pb
-
+        super(GFN, self).__init__()
+        self.energy_function = energy_function
         self.dim = dim
         self.harmonics_dim = harmonics_dim
         self.t_dim = t_dim
@@ -66,6 +54,7 @@ class AnnealedGFN(nn.Module):
         self.trajectory_length = trajectory_length
         self.langevin = langevin
         self.learned_variance = learned_variance
+        self.partial_energy = partial_energy
         self.t_scale = t_scale
 
         self.clipping = clipping
@@ -73,6 +62,8 @@ class AnnealedGFN(nn.Module):
         self.gfn_clip = gfn_clip
 
         self.langevin_scaling_per_dimension = langevin_scaling_per_dimension
+        self.conditional_flow_model = conditional_flow_model
+        self.learn_pb = learn_pb
 
         self.pis_architectures = pis_architectures
         self.lgv_layers = lgv_layers
@@ -83,18 +74,25 @@ class AnnealedGFN(nn.Module):
         self.log_var_range = log_var_range
         self.device = device
 
-        self.energy_function = energy_function
-
         if self.pis_architectures:
+
             self.t_model = TimeEncodingPIS(harmonics_dim, t_dim, hidden_dim)
-            self.s_model = StateEncodingPIS(dim, hidden_dim, s_emb_dim)
+            self.s_model = StateEncodingPIS(dim, s_emb_dim)
             self.joint_model = JointPolicyPIS(
-                dim, s_emb_dim, t_dim, hidden_dim, 2 * dim, joint_layers, zero_init
+                dim, s_emb_dim, t_dim, hidden_dim, joint_layers, zero_init
             )
-            self.back_model = JointPolicyPIS(
-                dim, s_emb_dim, t_dim, hidden_dim, 2 * dim, joint_layers, zero_init
-            )
+            if learn_pb:
+                self.back_model = JointPolicyPIS(
+                    dim, s_emb_dim, t_dim, hidden_dim, joint_layers, zero_init
+                )
             self.pb_scale_range = pb_scale_range
+
+            if self.conditional_flow_model:
+                self.flow_model = FlowModelPIS(
+                    dim, s_emb_dim, t_dim, hidden_dim, 1, joint_layers
+                )
+            else:
+                self.flow_model = torch.nn.Parameter(torch.tensor(0.0).to(self.device))
 
             if self.langevin_scaling_per_dimension:
                 self.langevin_scaling_model = LangevinScalingModelPIS(
@@ -106,16 +104,20 @@ class AnnealedGFN(nn.Module):
                 )
 
         else:
+
             self.t_model = TimeEncoding(harmonics_dim, t_dim, hidden_dim)
             self.s_model = StateEncoding(dim, hidden_dim, s_emb_dim)
-            self.joint_model = JointPolicy(
-                dim, s_emb_dim, t_dim, hidden_dim, 2 * dim, zero_init
-            )
-
-            self.back_model = JointPolicy(
-                dim, s_emb_dim, t_dim, hidden_dim, 2 * dim, zero_init
-            )
+            self.joint_model = JointPolicy(dim, s_emb_dim, t_dim, hidden_dim, zero_init)
+            if learn_pb:
+                self.back_model = JointPolicy(
+                    dim, s_emb_dim, t_dim, hidden_dim, zero_init
+                )
             self.pb_scale_range = pb_scale_range
+
+            if self.conditional_flow_model:
+                self.flow_model = FlowModel(s_emb_dim, t_dim, hidden_dim, 1)
+            else:
+                self.flow_model = torch.nn.Parameter(torch.tensor(0.0).to(self.device))
 
             if self.langevin_scaling_per_dimension:
                 self.langevin_scaling_model = LangevinScalingModel(
@@ -126,8 +128,6 @@ class AnnealedGFN(nn.Module):
                     s_emb_dim, t_dim, hidden_dim, 1, zero_init
                 )
 
-        self.logZ_ratio = torch.nn.Parameter(torch.zeros(trajectory_length).to(device))
-
     def split_params(self, tensor):
         mean, logvar = gaussian_params(tensor)
         if not self.learned_variance:
@@ -136,20 +136,25 @@ class AnnealedGFN(nn.Module):
             logvar = torch.tanh(logvar) * self.log_var_range
         return mean, logvar + np.log(self.pf_std_per_traj) * 2.0
 
+    def get_langevin_gradient(self, s, log_r):
+        s.requires_grad_(True)
+        with torch.enable_grad():
+            grad_log_r = torch.autograd.grad(log_r(s).sum(), s)[0].detach()
+            grad_log_r = torch.nan_to_num(grad_log_r)
+            if self.clipping:
+                grad_log_r = torch.clip(grad_log_r, -self.lgv_clip, self.lgv_clip)
+
+        return grad_log_r
+
     def predict_next_state(self, s, t, log_r):
         if self.langevin:
-            s.requires_grad_(True)
-            with torch.enable_grad():
-                grad_log_r = torch.autograd.grad(log_r(s).sum(), s)[0].detach()
-                grad_log_r = torch.nan_to_num(grad_log_r)
-                if self.clipping:
-                    grad_log_r = torch.clip(grad_log_r, -self.lgv_clip, self.lgv_clip)
+            grad_log_r = self.get_langevin_gradient(s, log_r)
 
-        batch_size = s.shape[0]
+        bsz = s.shape[0]
 
         t_lgv = t
 
-        t = self.t_model(t).repeat(batch_size, 1)
+        t = self.t_model(t).repeat(bsz, 1)
         s = self.s_model(s)
         s_new = self.joint_model(s, t)
 
@@ -162,23 +167,20 @@ class AnnealedGFN(nn.Module):
 
         if self.clipping:
             s_new = torch.clip(s_new, -self.gfn_clip, self.gfn_clip)
-        return s_new
+        return s_new, None
 
-    def generate_init_state(self, batch_size: int):
-        return torch.zeros(batch_size, self.dim, device=self.device)
+    def get_forward_trajectory(self, s, exploration_std=None, pis=False):
+        log_r = self.energy_function.log_reward
+        bsz = s.shape[0]
 
-    def get_trajectory_fwd(self, s, exploration_std, log_r, pis=False):
-        batch_size = s.shape[0]
-
-        # allocate memory first
-        logpf = torch.zeros((batch_size, self.trajectory_length), device=self.device)
-        logpb = torch.zeros((batch_size, self.trajectory_length), device=self.device)
+        logpf = torch.zeros((bsz, self.trajectory_length), device=self.device)
+        logpb = torch.zeros((bsz, self.trajectory_length), device=self.device)
         states = torch.zeros(
-            (batch_size, self.trajectory_length + 1, self.dim), device=self.device
+            (bsz, self.trajectory_length + 1, self.dim), device=self.device
         )
 
         for i in range(self.trajectory_length):
-            pfs = self.predict_next_state(s, i * self.dt, log_r)
+            pfs, _ = self.predict_next_state(s, i * self.dt, log_r)
             pf_mean, pflogvars = self.split_params(pfs)
 
             if exploration_std is None:
@@ -225,11 +227,16 @@ class AnnealedGFN(nn.Module):
                 noise**2 + logtwopi + np.log(self.dt) + pflogvars
             ).sum(1)
 
-            t = self.t_model((i + 1) * self.dt).repeat(batch_size, 1)
-            pbs = self.back_model(self.s_model(s_), t)
-            dmean, dvar = gaussian_params(pbs)
-            back_mean_correction = 1 + dmean.tanh() * self.pb_scale_range
-            back_var_correction = 1 + dvar.tanh() * self.pb_scale_range
+            if self.learn_pb:
+                t = self.t_model((i + 1) * self.dt).repeat(bsz, 1)
+                pbs = self.back_model(self.s_model(s_), t)
+                dmean, dvar = gaussian_params(pbs)
+                back_mean_correction = 1 + dmean.tanh() * self.pb_scale_range
+                back_var_correction = 1 + dvar.tanh() * self.pb_scale_range
+            else:
+                back_mean_correction, back_var_correction = torch.ones_like(
+                    s_
+                ), torch.ones_like(s_)
 
             if i > 0:
                 back_mean = (
@@ -250,25 +257,31 @@ class AnnealedGFN(nn.Module):
             s = s_
             states[:, i + 1] = s
 
-        return states, logpf, logpb, self.logZ_ratio.unsqueeze(1)
+        return states, logpf, logpb
 
     def get_trajectory_bwd(self, s, exploration_std, log_r):
-        batch_size = s.shape[0]
+        bsz = s.shape[0]
 
-        logpf = torch.zeros((batch_size, self.trajectory_length), device=self.device)
-        logpb = torch.zeros((batch_size, self.trajectory_length), device=self.device)
+        logpf = torch.zeros((bsz, self.trajectory_length), device=self.device)
+        logpb = torch.zeros((bsz, self.trajectory_length), device=self.device)
+        logf = torch.zeros((bsz, self.trajectory_length + 1), device=self.device)
         states = torch.zeros(
-            (batch_size, self.trajectory_length + 1, self.dim), device=self.device
+            (bsz, self.trajectory_length + 1, self.dim), device=self.device
         )
         states[:, -1] = s
 
         for i in range(self.trajectory_length):
             if i < self.trajectory_length - 1:
-                t = self.t_model(1.0 - i * self.dt).repeat(batch_size, 1)
-                pbs = self.back_model(self.s_model(s), t)
-                dmean, dvar = gaussian_params(pbs)
-                back_mean_correction = 1 + dmean.tanh() * self.pb_scale_range
-                back_var_correction = 1 + dvar.tanh() * self.pb_scale_range
+                if self.learn_pb:
+                    t = self.t_model(1.0 - i * self.dt).repeat(bsz, 1)
+                    pbs = self.back_model(self.s_model(s), t)
+                    dmean, dvar = gaussian_params(pbs)
+                    back_mean_correction = 1 + dmean.tanh() * self.pb_scale_range
+                    back_var_correction = 1 + dvar.tanh() * self.pb_scale_range
+                else:
+                    back_mean_correction, back_var_correction = torch.ones_like(
+                        s
+                    ), torch.ones_like(s)
 
                 mean = s - self.dt * s / (1.0 - i * self.dt) * back_mean_correction
                 var = (
@@ -286,8 +299,24 @@ class AnnealedGFN(nn.Module):
             else:
                 s_ = torch.zeros_like(s)
 
-            pfs = self.predict_next_state(s_, (1.0 - (i + 1) * self.dt), log_r)
+            pfs, flow = self.predict_next_state(s_, (1.0 - (i + 1) * self.dt), log_r)
             pf_mean, pflogvars = self.split_params(pfs)
+
+            logf[:, self.trajectory_length - i - 1] = flow
+            if self.partial_energy:
+                ref_log_var = np.log(
+                    self.t_scale * max(1, self.trajectory_length - i - 1) * self.dt
+                )
+                log_p_ref = -0.5 * (
+                    logtwopi + ref_log_var + np.exp(-ref_log_var) * (s**2)
+                ).sum(1)
+                logf[:, self.trajectory_length - i - 1] += (
+                    i + 1
+                ) * self.dt * log_p_ref + (
+                    self.trajectory_length - i - 1
+                ) * self.dt * log_r(
+                    s
+                )
 
             noise = ((s - s_) - self.dt * pf_mean) / (
                 np.sqrt(self.dt) * (pflogvars / 2).exp()
@@ -299,12 +328,9 @@ class AnnealedGFN(nn.Module):
             s = s_
             states[:, self.trajectory_length - i - 1] = s
 
-        return states, logpf, logpb
+        return states, logpf, logpb, logf
 
-    def sample(self, batch_size, log_r=None):
-        if log_r is None:
-            log_r = self.energy_function.log_reward
-
+    def sample(self, batch_size, log_r):
         s = torch.zeros(batch_size, self.dim).to(self.device)
         return self.get_trajectory_fwd(s, None, log_r)[0][:, -1]
 
@@ -315,5 +341,5 @@ class AnnealedGFN(nn.Module):
     def forward(self, s, exploration_std=None, log_r=None):
         return self.get_trajectory_fwd(s, exploration_std, log_r)
 
-    def get_logZ_ratio(self):
-        return self.logZ_ratio
+    def generate_initial_state(self, batch_size: int):
+        return torch.zeros(batch_size, self.dim).to(self.device)

@@ -4,7 +4,7 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
-from typing import Optional
+from typing import Optional, Callable
 
 from energy import BaseEnergy
 
@@ -50,7 +50,6 @@ class GFN(SamplerModel):
             trajectory_length=trajectory_length,
             device=device,
         )
-        self.dt = 1.0 / trajectory_length
 
         self.state_encoder = state_encoder
         self.time_encoder = time_encoder
@@ -61,9 +60,22 @@ class GFN(SamplerModel):
 
         # Langevin scaler for Langevin parametrization.
         self.langevin_scaler = langevin_scaler
+        self.langevin_parametrization = langevin_scaler is not None
+        self.langevin_scaler_is_PIS = (
+            type(self.langevin_scaler) == LangevinScalingModelPIS
+        )
 
         # Flow model
         self.flow_model = flow_model
+
+        if flow_model is None:
+            # If flow is not learned, at least learn log Z (= total flow F(s_0))
+            self.logZ = torch.nn.Parameter(torch.tensor(0.0, device=self.device))
+
+        # log Z ratio estimator (This one only used in annealed-GFN)
+        self.logZ_ratio = torch.nn.Parameter(
+            torch.zeros(trajectory_length, device=device)
+        )
 
         # Clipping on model output
         self.clipping: bool = clipping
@@ -92,7 +104,11 @@ class GFN(SamplerModel):
 
         return mean, logvar + np.log(self.pf_std_per_traj) * 2.0
 
-    def predict_next_state(self, state: torch.Tensor, time: float):
+    def get_forward_params(self, state: torch.Tensor, time: float):
+        """
+        Get forward conditional density's parameters.
+        For given state s and time t, return the parameters of p_F(-| s_t).
+        """
         assert state.dim() == 2 and state.size(1) == self.sample_dim
 
         batch_size = state.shape[0]
@@ -100,11 +116,11 @@ class GFN(SamplerModel):
         encoded_time = self.time_encoder(time).repeat(batch_size, 1)
         encoded_state = self.state_encoder(state)
 
-        # next_state is (batch_size, 2 * sample_dim) sized tensor.
         # Each chunk (batch_size, sample_dim), (batch_size, sample_dim) represents mean and log variance.
         mean_and_logvar = self.forward_model(encoded_state, encoded_time)
 
-        if self.langevin_scaler is not None:
+        # Langevin parametrization trick, scale mean of forward density.
+        if self.langevin_parametrization:
             grad_log_reward = -self.energy_function.score(state)
 
             grad_log_reward = torch.nan_to_num(grad_log_reward)
@@ -113,23 +129,28 @@ class GFN(SamplerModel):
                     grad_log_reward, -self.lgv_clip, self.lgv_clip
                 )
 
-            # Langevin parametrization trick.
-            # Scaling mean of forward conditional density.
-            scale = self.langevin_scaling_model(state, time)
-            mean_and_logvar[..., : self.sample_dim] += scale * grad_log_reward
+            # TODO: Depends on architecture (e.g., PIS or not), langevin scaler takes different input.
+            # Ad-hoc implementation for now. Need to be refactored.
+            if self.langevin_scaler_is_PIS:
+                scale = self.langevin_scaler(time)
+            else:
+                scale = self.langevin_scaler(encoded_state, encoded_time)
 
-        if self.flow_model is not None:
-            flow = self.flow_model(encoded_state, encoded_time).squeeze(-1).squeeze(-1)
-        else:
-            flow = None
+            mean_and_logvar[..., : self.sample_dim] += scale * grad_log_reward
 
         if self.clipping:
             mean_and_logvar = torch.clip(mean_and_logvar, -self.gfn_clip, self.gfn_clip)
 
         mean, logvar = self.split_params(mean_and_logvar)
-        return mean, logvar, flow
+        return {"mean": mean, "logvar": logvar}
 
-    def predict_prev_state(self, state: torch.Tensor, time: float):
+    def get_backward_params(self, state: torch.Tensor, time: float):
+        """
+        Get backward conditional density's parameters.
+        For given state s and time t, return the parameters of p_B(-| s_t).
+        """
+        assert state.dim() == 2 and state.size(1) == self.sample_dim
+
         batch_size = state.shape[0]
         prev_time = time - self.dt
 
@@ -140,44 +161,103 @@ class GFN(SamplerModel):
 
             dmean, dvar = gaussian_params(pbs)
 
-            back_mean_correction = 1 + dmean.tanh() * self.pb_scale_range
-            back_var_correction = 1 + dvar.tanh() * self.pb_scale_range
+            mean_correction = 1 + dmean.tanh() * self.pb_scale_range
+            var_correction = 1 + dvar.tanh() * self.pb_scale_range
         else:
-            back_mean_correction = torch.ones_like(state)
-            back_var_correction = torch.ones_like(state)
+            mean_correction = torch.ones_like(state)
+            var_correction = torch.ones_like(state)
 
-        back_mean = state - self.dt * state / (time) * back_mean_correction
+        # Learned model adjust Brownian motion by multiplying correction coefficient to params.
+        mean = state - self.dt * state / (time) * mean_correction
+        var = (self.pf_std_per_traj**2) * (prev_time / time) * self.dt * var_correction
 
-        back_var = (
-            (self.pf_std_per_traj**2)
-            * (prev_time / time)
-            * self.dt
-            * back_var_correction
+        return {"mean": mean, "var": var}
+
+    def get_next_state(
+        self,
+        state: torch.Tensor,
+        time: float,
+        exploration_schedule: Optional[Callable[[float], float]] = None,
+        stochastic_backprop: bool = False,
+    ):
+        """
+        For given state s and time t,
+        sample next state s_{t+1} from p_F(-| s_t) and
+        return the parameters of p_F(-| s_t).
+
+        Note that sample can be generated via additional exploration,
+        and follows little different distribution from p_F(-| s_t).
+        """
+        pf_params = self.get_forward_params(state, time)
+        pf_mean, pf_logvar = pf_params["mean"], pf_params["logvar"]
+
+        if exploration_schedule is not None:
+            exploration_std = exploration_schedule(time)
+            pf_logvar_for_sample = self.add_more_exploration(pf_logvar, exploration_std)
+        else:
+            pf_logvar_for_sample = pf_logvar
+
+        if stochastic_backprop:
+            pf_mean_for_sample = pf_mean
+            pf_logvar_for_sample = pf_logvar_for_sample
+        else:
+            pf_mean_for_sample = pf_mean.detach()
+            pf_logvar_for_sample = pf_logvar_for_sample.detach()
+
+        next_state = (
+            state
+            + self.dt * pf_mean_for_sample
+            + np.sqrt(self.dt)
+            * (pf_logvar_for_sample / 2).exp()
+            * torch.randn_like(state, device=self.device)
         )
 
-        return back_mean, back_var
+        return next_state, pf_params
+
+    def get_prev_state(self, state: torch.Tensor, time: float, **kwargs):
+        """
+        For given state s and time t,
+        sample next state s_{t-1} from p_B(-| s_t) and
+        return the parameters of p_B(-| s_t).
+
+        Note that sample can be generated via additional exploration,
+        and follows little different distribution from p_B(-| s_t).
+        """
+        pb_params = self.get_backward_params(state, time)
+        pb_mean, pb_var = pb_params["mean"], pb_params["var"]
+
+        # For backward transition, we don't add exploration noise.
+        # For backward transition, we don't propagate through sample.
+        prev_state = pb_mean.detach() + pb_var.sqrt().detach() * torch.randn_like(
+            state, device=self.device
+        )
+
+        return prev_state, pb_params
+
+    def get_forward_logprob(
+        self,
+        next: torch.Tensor,
+        cur: torch.Tensor,
+        params: dict,
+    ) -> torch.Tensor:
+        pf_mean, pf_logvar = params["mean"], params["logvar"]
+        return gaussian_log_prob(
+            next, cur + self.dt * pf_mean, np.log(self.dt) + pf_logvar
+        )
+
+    def get_backward_logprob(
+        self,
+        prev: torch.Tensor,
+        cur: torch.Tensor,
+        params: dict,
+    ) -> torch.Tensor:
+        pb_mean, pb_var = params["mean"], params["var"]
+        return gaussian_log_prob(prev, pb_mean, pb_var.log())
 
     def generate_initial_state(self, batch_size: int) -> torch.Tensor:
         return torch.zeros(batch_size, self.sample_dim, device=self.device)
 
-    def allocate_memory(self, batch_size: int):
-        """
-        Allocate memory (i.e., create empty tensor) for trajectory generation.
-        """
-        logpf = torch.zeros((batch_size, self.trajectory_length), device=self.device)
-
-        logpb = torch.zeros((batch_size, self.trajectory_length), device=self.device)
-
-        logf = torch.zeros((batch_size, self.trajectory_length + 1), device=self.device)
-
-        trajectories = torch.zeros(
-            (batch_size, self.trajectory_length + 1, self.sample_dim),
-            device=self.device,
-        )
-
-        return logpf, logpb, logf, trajectories
-
-    def add_more_exploration(self, log_var, exploration_std):
+    def add_more_exploration(self, log_var: torch.Tensor, exploration_std: float):
         if exploration_std is None:
             pflogvars_sample = log_var
         elif exploration_std <= 0.0:
@@ -192,149 +272,6 @@ class GFN(SamplerModel):
 
         return pflogvars_sample
 
-    def forward_iter(self, trajectories):
-        for cur_idx in range(self.trajectory_length):
-            next_idx = cur_idx + 1
-
-            cur_state = trajectories[:, cur_idx, :]
-
-            cur_time = cur_idx * self.dt
-            next_time = next_idx * self.dt
-
-            yield (cur_state, cur_time, next_time, cur_idx, next_idx)
-
-    def backward_iter(self, trajectories):
-        for cur_idx in range(self.trajectory_length, 0, -1):
-            prev_idx = cur_idx - 1
-
-            cur_state = trajectories[:, cur_idx, :]
-
-            cur_time = cur_idx * self.dt
-            prev_time = prev_idx * self.dt
-
-            yield (cur_state, cur_time, prev_time, cur_idx, prev_idx)
-
-    def get_forward_trajectory(
-        self,
-        initial_states: torch.Tensor,
-        exploration_std=None,
-        stochastic_backprop: bool = False,
-        return_log_flow: bool = False,
-    ):
-        batch_size = initial_states.shape[0]
-        log_reward = self.energy_function.log_reward
-        logpf, logpb, logf, trajectories = self.allocate_memory(batch_size)
-
-        # Tensor shape check
-        assert logpf.size() == (batch_size, self.trajectory_length)
-        assert logpb.size() == (batch_size, self.trajectory_length)
-        assert logf.size() == (batch_size, self.trajectory_length + 1)
-        assert trajectories.size() == (
-            batch_size,
-            self.trajectory_length + 1,
-            self.sample_dim,
-        )
-
-        # Fill the initial states on trajectory.
-        trajectories[:, 0, :] = initial_states
-
-        for cur_state, cur_time, next_time, cur_idx, next_idx in self.forward_iter(
-            trajectories
-        ):
-            pf_mean, pf_logvar, flow = self.predict_next_state(
-                cur_state, cur_time, log_reward
-            )
-
-            logf[:, cur_idx] = flow
-
-            pflogvars_for_sample = self.add_more_exploration(
-                pf_logvar,
-                exploration_std(cur_idx) if exploration_std is not None else None,
-            )
-
-            # For stochastic back prop (e.g. PIS),
-            # we allow backpropagation through the mean, variance used for sampling.
-            if stochastic_backprop:
-                pf_mean_for_sample = pf_mean
-                pflogvars_for_sample = pflogvars_for_sample
-            else:
-                pf_mean_for_sample = pf_mean.detach()
-                pflogvars_for_sample = pflogvars_for_sample.detach()
-
-            # Sampling next state
-            next_state = (
-                cur_state
-                + self.dt * pf_mean_for_sample
-                + np.sqrt(self.dt)
-                * (pflogvars_for_sample / 2).exp()
-                * torch.randn_like(cur_state, device=self.device)
-            )
-
-            # For this calculation, we must allow backpropagation through the mean, variance.
-            logpf[:, cur_idx] = gaussian_log_prob(
-                next_state, cur_state + self.dt * pf_mean, np.log(self.dt) + pf_logvar
-            )
-
-            if cur_idx > 0:
-                pb_mean, pb_var = self.predict_prev_state(next_state, next_time)
-                logpb[:, cur_idx] = gaussian_log_prob(cur_state, pb_mean, pb_var.log())
-            else:
-                # p_B(dt -> 0) is deterministic, so need not be calculated.
-                pass
-
-            trajectories[:, next_idx] = next_state
-
-        if return_log_flow:
-            return trajectories, logpf, logpb, logf
-        else:
-            return trajectories, logpf, logpb
-
-    def get_backward_trajectory(
-        self, final_states: torch.Tensor, return_log_flow: bool = False
-    ):
-        batch_size = final_states.shape[0]
-        logpf, logpb, logf, trajectories = self.allocate_memory(batch_size)
-
-        # Fill final states on trajectory.
-        trajectories[:, -1] = final_states
-
-        for cur_state, cur_time, prev_time, cur_idx, prev_idx in self.backward_iter(
-            trajectories
-        ):
-            if cur_idx > 1:
-                pb_mean, pb_var = self.predict_prev_state(cur_state, cur_time)
-
-                prev_state = (
-                    pb_mean.detach()
-                    + pb_var.sqrt().detach()
-                    * torch.randn_like(cur_state, device=self.device)
-                )
-
-                logpb[:, prev_idx] = gaussian_log_prob(
-                    prev_state, pb_mean, pb_var.log()
-                )
-            else:
-                # For p_B(dt -> 0), backward transition is deterministic.
-                prev_state = torch.zeros(batch_size, device=self.device)
-
-            trajectories[:, prev_idx] = prev_state
-
-            pf_mean, pf_logvar, flow = self.predict_next_state(prev_state, prev_time)
-            logf[:, prev_idx] = flow
-            logpf[:, prev_idx] = gaussian_log_prob(cur_state, pf_mean, pf_logvar)
-
-        if return_log_flow:
-            return trajectories, logpf, logpb, logf
-        else:
-            return trajectories, logpf, logpb
-
-    def sample(self, batch_size: int):
-        initial_states = self.generate_initial_state(batch_size)
-
-        trajectories, _ = self.get_forward_trajectory(initial_states, None)
-
-        return trajectories[:, -1]
-
     def sleep_phase_sample(self, batch_size, exploration_std):
         initial_states = self.generate_initial_state(batch_size)
 
@@ -344,3 +281,38 @@ class GFN(SamplerModel):
 
     def forward(self, state, exploration_std=None, log_r=None):
         return self.get_forward_trajectory(state, exploration_std, log_r)
+
+    def get_flow_from_trajectory(self, trajectory: torch.Tensor) -> torch.Tensor:
+        if self.flow_model is None:
+            raise Exception("Flow model is not defined.")
+
+        assert (
+            trajectory.dim() == 3
+            and trajectory.size(1) == self.trajectory_length + 1
+            and trajectory.size(2) == self.sample_dim
+        )
+
+        batch_size = trajectory.shape[0]
+
+        encoded_trajectory = self.state_encoder(trajectory)
+
+        # time is (B, T + 1, 1) sized tensor
+        time = (
+            torch.linspace(0, 1, self.trajectory_length + 1, device=self.device)
+            .repeat(batch_size, 1)
+            .unsqueeze(-1)
+        )
+
+        # Now, encoded_time is (B, T + 1, t_emb_dim) sized tensor
+        encoded_time = self.time_encoder(time)
+
+        flow = self.flow_model(encoded_trajectory, encoded_time).squeeze(-1)
+
+        return flow
+
+    def get_learned_logZ(self, trajectory: torch.Tensor):
+        if self.flow_model is None:
+            return self.logZ
+        else:
+            flow = self.get_flow_from_trajectory(trajectory)
+            return flow[:, 0]
