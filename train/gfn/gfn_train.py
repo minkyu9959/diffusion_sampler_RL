@@ -128,8 +128,8 @@ def fwd_train_step(
     coeff_matrix,
     return_exp=False,
 ):
-    init_state = torch.zeros(train_cfg.batch_size, energy.data_ndim).to(
-        train_cfg.device
+    init_state = torch.zeros(
+        train_cfg.batch_size, energy.data_ndim, device=train_cfg.device
     )
     loss = get_gfn_forward_loss(
         train_cfg.mode_fwd,
@@ -157,9 +157,9 @@ def bwd_train_step(
             train_cfg.batch_size, exploration_std
         ).to(train_cfg.device)
     elif train_cfg.sampling == "energy":
-        samples = energy.sample(train_cfg.batch_size).to(train_cfg.device)
+        samples = energy.sample(train_cfg.batch_size, device=train_cfg.device)
     elif train_cfg.sampling == "buffer":
-        if train_cfg.local_search.do_local_search:
+        if "local_search" in train_cfg and train_cfg.local_search is not None:
             if it % train_cfg.local_search.ls_cycle < 2:
                 samples, rewards = buffer.sample()
                 local_search_samples, log_r = langevin_dynamics(

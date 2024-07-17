@@ -1,37 +1,49 @@
 import torch
 
+from models import GFN
 
-def fwd_tb(initial_state, gfn, log_reward_fn, exploration_std=None, return_exp=False):
-    states, log_pfs, log_pbs, log_fs = gfn.get_trajectory_fwd(
-        initial_state, exploration_std, log_reward_fn
+
+def fwd_tb(
+    initial_state, gfn: GFN, log_reward_fn, exploration_std=None, return_exp=False
+):
+    states, log_pfs, log_pbs = gfn.get_forward_trajectory(
+        initial_state,
+        exploration_schedule=exploration_std,
     )
+
+    log_Z = gfn.get_learned_logZ(states)
+
     with torch.no_grad():
         log_r = log_reward_fn(states[:, -1]).detach()
 
-    loss = 0.5 * ((log_pfs.sum(-1) + log_fs[:, 0] - log_pbs.sum(-1) - log_r) ** 2)
+    loss = 0.5 * ((log_pfs.sum(-1) + log_Z - log_pbs.sum(-1) - log_r) ** 2)
+
     if return_exp:
         return loss.mean(), states, log_pfs, log_pbs, log_r
     else:
-
         return loss.mean()
 
 
-def bwd_tb(initial_state, gfn, log_reward_fn, exploration_std=None):
-    states, log_pfs, log_pbs, log_fs = gfn.get_trajectory_bwd(
-        initial_state, exploration_std, log_reward_fn
+def bwd_tb(initial_state, gfn: GFN, log_reward_fn, exploration_std=None):
+    states, log_pfs, log_pbs = gfn.get_backward_trajectory(
+        initial_state,
+        exploration_schedule=exploration_std,
     )
+
+    log_Z = gfn.get_learned_logZ(states)
+
     with torch.no_grad():
         log_r = log_reward_fn(states[:, -1]).detach()
 
-    loss = 0.5 * ((log_pfs.sum(-1) + log_fs[:, 0] - log_pbs.sum(-1) - log_r) ** 2)
+    loss = 0.5 * ((log_pfs.sum(-1) + log_Z - log_pbs.sum(-1) - log_r) ** 2)
     return loss.mean()
 
 
 def fwd_tb_avg(
-    initial_state, gfn, log_reward_fn, exploration_std=None, return_exp=False
+    initial_state, gfn: GFN, log_reward_fn, exploration_std=None, return_exp=False
 ):
-    states, log_pfs, log_pbs, _ = gfn.get_trajectory_fwd(
-        initial_state, exploration_std, log_reward_fn
+    states, log_pfs, log_pbs = gfn.get_forward_trajectory(
+        initial_state, exploration_schedule=exploration_std
     )
     with torch.no_grad():
         log_r = log_reward_fn(states[:, -1]).detach()
@@ -46,9 +58,9 @@ def fwd_tb_avg(
         return 0.5 * (loss**2).mean()
 
 
-def bwd_tb_avg(initial_state, gfn, log_reward_fn, exploration_std=None):
-    states, log_pfs, log_pbs, _ = gfn.get_trajectory_bwd(
-        initial_state, exploration_std, log_reward_fn
+def bwd_tb_avg(initial_state, gfn: GFN, log_reward_fn, exploration_std=None):
+    states, log_pfs, log_pbs = gfn.get_backward_trajectory(
+        initial_state, exploration_schedule=exploration_std
     )
     with torch.no_grad():
         log_r = log_reward_fn(states[:, -1]).detach()
@@ -58,10 +70,13 @@ def bwd_tb_avg(initial_state, gfn, log_reward_fn, exploration_std=None):
     return 0.5 * (loss**2).mean()
 
 
-def db(initial_state, gfn, log_reward_fn, exploration_std=None, return_exp=False):
-    states, log_pfs, log_pbs, log_fs = gfn.get_trajectory_fwd(
-        initial_state, exploration_std, log_reward_fn
+def db(initial_state, gfn: GFN, log_reward_fn, exploration_std=None, return_exp=False):
+    states, log_pfs, log_pbs = gfn.get_forward_trajectory(
+        initial_state, exploration_schedule=exploration_std
     )
+
+    log_fs = gfn.get_flow_from_trajectory(states)
+
     with torch.no_grad():
         log_fs[:, -1] = log_reward_fn(states[:, -1]).detach()
 
@@ -74,17 +89,17 @@ def db(initial_state, gfn, log_reward_fn, exploration_std=None, return_exp=False
 
 
 def annealed_db(
-    initial_state, gfn, log_reward_fn, exploration_std=None, return_exp=False
+    initial_state, gfn: GFN, log_reward_fn, exploration_std=None, return_exp=False
 ):
     # Generate forward trajectory.
-    states, log_pfs, log_pbs, _ = gfn.get_trajectory_fwd(
-        initial_state, exploration_std, log_reward_fn
+    states, log_pfs, log_pbs = gfn.get_forward_trajectory(
+        initial_state, exploration_schedule=exploration_std
     )
 
-    logZ_ratio = gfn.get_logZ_ratio()
+    logZ_ratio = gfn.logZ_ratio
 
     def interpolated_log_reward_fn(states):
-        time = torch.linspace(0, 1, gfn.trajectory_length + 1).to(gfn.device)
+        time = torch.linspace(0, 1, gfn.trajectory_length + 1, device=gfn.device)
 
         # Prior is standard normal gaussian.
         prior_log_reward = -0.5 * (
@@ -110,15 +125,18 @@ def annealed_db(
 
 def subtb(
     initial_state,
-    gfn,
+    gfn: GFN,
     log_reward_fn,
     coef_matrix,
     exploration_std=None,
     return_exp=False,
 ):
-    states, log_pfs, log_pbs, log_fs = gfn.get_trajectory_fwd(
-        initial_state, exploration_std, log_reward_fn
+    states, log_pfs, log_pbs = gfn.get_forward_trajectory(
+        initial_state, exploration_schedule=exploration_std
     )
+
+    log_fs = gfn.get_flow_from_trajectory(states)
+
     with torch.no_grad():
         log_fs[:, -1] = log_reward_fn(states[:, -1]).detach()
 
@@ -153,17 +171,17 @@ def subtb(
         ).sum()
 
 
-def bwd_mle(samples, gfn, log_reward_fn, exploration_std=None):
-    states, log_pfs, log_pbs, log_fs = gfn.get_trajectory_bwd(
-        samples, exploration_std, log_reward_fn
+def bwd_mle(samples, gfn: GFN, log_reward_fn, exploration_std=None):
+    states, log_pfs, log_pbs = gfn.get_backward_trajectory(
+        samples, exploration_schedule=exploration_std
     )
     loss = -log_pfs.sum(-1)
     return loss.mean()
 
 
-def pis(initial_state, gfn, log_reward_fn, exploration_std=None):
-    states, log_pfs, log_pbs, log_fs = gfn.get_trajectory_fwd(
-        initial_state, exploration_std, log_reward_fn, pis=True
+def pis(initial_state, gfn: GFN, log_reward_fn, exploration_std=None):
+    states, log_pfs, log_pbs = gfn.get_forward_trajectory(
+        initial_state, exploration_schedule=exploration_std, stochastic_backprop=True
     )
     with torch.enable_grad():
         log_r = log_reward_fn(states[:, -1])

@@ -2,7 +2,7 @@ import torch
 
 import numpy as np
 
-from models import GFN, AnnealedGFN
+from models import GFN
 from buffer import *
 from energy import BaseEnergy
 
@@ -30,29 +30,31 @@ def calculate_subtb_coeff_matrix(lamda, N):
 
 def get_GFN_optimizer(
     optimizer_cfg: DictConfig,
-    gfn_model: torch.nn.Module,
+    gfn_model: GFN,
 ):
     param_groups = [
-        {"params": gfn_model.t_model.parameters()},
-        {"params": gfn_model.s_model.parameters()},
-        {"params": gfn_model.joint_model.parameters()},
-        {"params": gfn_model.langevin_scaling_model.parameters()},
+        {"params": gfn_model.time_encoder.parameters()},
+        {"params": gfn_model.state_encoder.parameters()},
+        {"params": gfn_model.forward_model.parameters()},
     ]
+    if gfn_model.langevin_scaler is not None:
+        param_groups += [{"params": gfn_model.langevin_scaler.parameters()}]
 
-    if gfn_model.conditional_flow_model:
+    if gfn_model.flow_model is not None:
         param_groups += [
             {"params": gfn_model.flow_model.parameters(), "lr": optimizer_cfg.lr_flow}
         ]
-    elif type(gfn_model) == AnnealedGFN:
-        param_groups += [{"params": gfn_model.logZ_ratio, "lr": optimizer_cfg.lr_flow}]
     else:
-        param_groups += [
-            {"params": [gfn_model.flow_model], "lr": optimizer_cfg.lr_flow}
-        ]
+        param_groups += [{"params": gfn_model.logZ, "lr": optimizer_cfg.lr_flow}]
 
-    if gfn_model.learn_pb:
+    param_groups += [{"params": gfn_model.logZ_ratio, "lr": optimizer_cfg.lr_flow}]
+
+    if gfn_model.backward_model is not None:
         param_groups += [
-            {"params": gfn_model.back_model.parameters(), "lr": optimizer_cfg.lr_back}
+            {
+                "params": gfn_model.backward_model.parameters(),
+                "lr": optimizer_cfg.lr_back,
+            }
         ]
 
     if optimizer_cfg.use_weight_decay:
@@ -85,10 +87,10 @@ def get_buffer(buffer_cfg: DictConfig, energy_function: BaseEnergy) -> BaseBuffe
 
 def get_gfn_forward_loss(
     mode,
-    init_state,
-    gfn_model,
+    init_state: torch.Tensor,
+    gfn_model: GFN,
     log_reward,
-    coeff_matrix,
+    coeff_matrix: torch.Tensor,
     exploration_std=None,
     return_exp=False,
 ):

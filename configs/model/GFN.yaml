@@ -21,7 +21,7 @@ forward_model:
 backward_model:
   s_dim: ${energy.dim}
 
-state_model:
+state_encoder:
   s_dim: ${energy.dim}
 
 # If yout want to scale gradient of energy dimension-wise,
@@ -34,14 +34,9 @@ trajectory_length: 100
 t_scale: 1.0
 learned_variance: false
 log_var_range: 4.0
-learn_pb: false
 
 pb_scale_range: 0.1
-
-partial_energy: false
 
 clipping: true
 lgv_clip: 1e2
 gfn_clip: 1e4
-
-conditional_flow_model: false

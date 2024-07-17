@@ -8,7 +8,7 @@ from .sample_based_metric import compute_all_distribution_distances
 from models.base_model import SamplerModel
 
 from .density_based_metric import (
-    compute_all_density_based_metrics,
+    estimate_mean_log_likelihood,
     log_partition_function,
 )
 
@@ -21,6 +21,7 @@ def add_prefix_to_dict_key(prefix: str, dict: dict) -> dict:
     return {f"{prefix}/name": dict[name] for name in dict}
 
 
+@torch.no_grad()
 def compute_all_metrics(
     model: SamplerModel,
     eval_data_size: int = 2000,
@@ -45,20 +46,15 @@ def compute_all_metrics(
     generated_sample = model.sample(batch_size=eval_data_size)
 
     if energy_function.can_sample:
-        # Sample based metric if we can sample from the energy function.
         assert GROUND_TRUTH_SAMPLE is not None
 
         metrics.update(
             compute_all_distribution_distances(generated_sample, GROUND_TRUTH_SAMPLE)
         )
 
-    # Density based metric.
-    metrics.update(
-        compute_all_density_based_metrics(
-            model,
-            generated_sample,
+        metrics["mean_log_likelihood"] = estimate_mean_log_likelihood(
+            GROUND_TRUTH_SAMPLE, model
         )
-    )
 
     # Estimate log partition value.
     metrics.update(log_partition_function(model, sample_size=eval_data_size))

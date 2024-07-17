@@ -8,5 +8,4 @@ train:
   sampling: "energy"
   mode_bwd: tb
 
-  local_search:
-    do_local_search: false
+  local_search: null
