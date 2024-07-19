@@ -27,13 +27,13 @@ def test_funnel_log_prob():
 
 
 def test_gmm_make_plot():
-    energy_function = GMM25(device="cuda:0")
+    energy_function = GMM25(device="cuda:0", dim=2)
     sample = torch.zeros((100, 2), device="cuda:0")
 
     fig, _ = energy_function.make_plot(sample)
     fig.savefig("./test/gmm25_test_figure.png")
 
-    energy_function = GMM9(device="cuda:0")
+    energy_function = GMM9(device="cuda:0", dim=2)
     sample = torch.zeros((100, 2), device="cuda:0")
 
     fig, _ = energy_function.make_plot(sample)

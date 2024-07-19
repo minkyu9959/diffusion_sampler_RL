@@ -3,7 +3,7 @@ import torch
 from buffer import *
 from energy import *
 
-energy_function = GMM25("cuda:0")
+energy_function = GMM25("cuda:0", dim=2)
 
 
 def test_simple_replay_buffer():
