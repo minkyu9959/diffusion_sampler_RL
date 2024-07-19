@@ -31,4 +31,4 @@ hydra:
       Specifically, it measures the time taken for one training step for the model.
       Here, one_training_step = get_forward_trajectory + back propagation
 
-      Usage: python3 profiler/profile-model.py +name=(model name you want to profile)
+      Usage: python3 profiler/profile-model.py name=(model name you want to profile)
