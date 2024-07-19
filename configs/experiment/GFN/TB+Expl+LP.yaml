@@ -1,0 +1,30 @@
+# @package _global_
+
+wandb:
+  project: "Diffusion-sampler Reproduce"
+  group: "GFN/TB+Expl+LP"
+
+defaults:
+  - override /model: GFN-PIS
+
+model:
+  t_scale: 1.0
+
+  backward_model: null
+  flow_model: null
+
+  # Langevin scaling is just scalar not vector per dimension.
+  langevin_scaler:
+    out_dim: 1
+
+train:
+  epochs: 10000
+
+  train_mode: fwd
+  fwd_loss: tb
+
+  exploratory: true
+  exploration_wd: true
+  exploration_factor: 0.2
+
+  local_search: null

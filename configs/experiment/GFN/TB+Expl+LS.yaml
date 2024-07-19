@@ -1,0 +1,32 @@
+# @package _global_
+
+wandb:
+  project: "Diffusion-sampler Reproduce"
+  group: "GFN/TB+Expl+LS"
+
+defaults:
+  - override /model: GFN-PIS
+
+model:
+  t_scale: 1.0
+
+  backward_model: null
+  langevin_scaler: null
+  flow_model: null
+
+train:
+  train_mode: both_ways
+  fwd_loss: tb
+
+  exploratory: true
+  exploration_wd: true
+  exploration_factor: 0.1
+
+  buffer:
+    prioritized: true
+    rank_weight: 0.01
+
+  local_search:
+    ld_step: 0.1
+    ld_schedule: true
+    target_acceptance_rate: 0.574
