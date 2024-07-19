@@ -136,6 +136,8 @@ class SamplerModel(torch.nn.Module, metaclass=abc.ABCMeta):
             log_backward_conditional_probability:
             torch.tensor with shape (batch_size, trajectory_length)
         """
+        assert initial_states.dim() == 2 and initial_states.shape[1] == self.sample_dim
+
         batch_size = initial_states.shape[0]
 
         # Create empty (zero) tensor with corresponding size.
@@ -159,6 +161,8 @@ class SamplerModel(torch.nn.Module, metaclass=abc.ABCMeta):
                     cur_state, next_state, pb_params
                 )
 
+            # This step is essential for back prop to work properly.
+            # Reading cur_state from trajectory tensor will cause error.
             cur_state = next_state
 
         return trajectories, logpf, logpb
@@ -180,24 +184,27 @@ class SamplerModel(torch.nn.Module, metaclass=abc.ABCMeta):
             log_backward_conditional_probability:
             torch.tensor with shape (batch_size, trajectory_length)
         """
+        assert final_states.dim() == 2 and final_states.shape[1] == self.sample_dim
+
         batch_size = final_states.shape[0]
+
         logpf, logpb, trajectories = self._allocate_memory(batch_size)
 
         trajectories[:, -1] = cur_state = final_states
 
         for cur_time, prev_time, cur_idx, prev_idx in self._backward_iter():
             # When cur_idx == 1, p_B(s_0|s_dt) is deterministic.
-            if cur_idx > 1:
+            if cur_idx == 1:
+                prev_state = torch.zeros(
+                    (batch_size, self.sample_dim), device=self.device
+                )
+            else:
                 prev_state, pb_params = self.get_prev_state(
                     cur_state, cur_time, **kwargs
                 )
 
                 logpb[:, prev_idx] = self.get_backward_logprob(
                     prev_state, cur_state, pb_params
-                )
-            else:
-                prev_state = torch.zeros(
-                    (batch_size, self.sample_dim), device=self.device
                 )
 
             trajectories[:, prev_idx] = prev_state

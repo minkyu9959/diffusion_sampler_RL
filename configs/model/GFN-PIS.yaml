@@ -1,17 +1,17 @@
 _target_: models.gfn.GFN
 
 defaults:
-  - components@state_encoder: StateEncoding
+  - components@state_encoder: StateEncoding-PIS
 
-  - components@time_encoder: TimeEncoding
+  - components@time_encoder: TimeEncoding-PIS
 
-  - components@forward_model: JointPolicy
+  - components@forward_model: JointPolicy-PIS
 
-  - components@backward_model: JointPolicy
+  - components@backward_model: JointPolicy-PIS
 
-  - components@flow_model: FlowModel
+  - components@flow_model: FlowModel-PIS
 
-  - components@langevin_scaler: LangevinScaling
+  - components@langevin_scaler: LangevinScaling-PIS
 
 forward_model:
   s_dim: ${energy.dim}
