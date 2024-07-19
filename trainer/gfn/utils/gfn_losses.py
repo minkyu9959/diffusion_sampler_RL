@@ -3,30 +3,53 @@ import torch
 from models import GFN
 
 
+def trajectory_balance_loss(
+    log_pfs: torch.Tensor,
+    log_pbs: torch.Tensor,
+    log_Z: torch.Tensor,
+    log_reward: torch.Tensor,
+):
+    loss = 0.5 * ((log_pfs.sum(-1) + log_Z - log_pbs.sum(-1) - log_reward) ** 2)
+    return loss.mean()
+
+
+def detailed_balance_loss(
+    log_pfs: torch.Tensor,
+    log_pbs: torch.Tensor,
+    log_fs: torch.Tensor,
+    log_reward: torch.Tensor,
+):
+    log_fs[:, -1] = log_reward
+
+    loss = 0.5 * ((log_pfs + log_fs[:, :-1] - log_pbs - log_fs[:, 1:]) ** 2).sum(-1)
+
+    return loss.mean()
+
+
 def fwd_tb(
     initial_state, gfn: GFN, log_reward_fn, exploration_std=None, return_exp=False
 ):
-    states, log_pfs, log_pbs = gfn.get_forward_trajectory(
+    trajectory, log_pfs, log_pbs = gfn.get_forward_trajectory(
         initial_state,
         exploration_schedule=exploration_std,
     )
 
-    log_Z = gfn.get_learned_logZ(states)
+    log_Z = gfn.get_learned_logZ(trajectory)
 
     with torch.no_grad():
-        log_r = log_reward_fn(states[:, -1]).detach()
+        log_r = log_reward_fn(trajectory[:, -1]).detach()
 
-    loss = 0.5 * ((log_pfs.sum(-1) + log_Z - log_pbs.sum(-1) - log_r) ** 2)
+    loss = trajectory_balance_loss(log_pfs, log_pbs, log_Z, log_r)
 
     if return_exp:
-        return loss.mean(), states, log_pfs, log_pbs, log_r
+        return loss, trajectory, log_pfs, log_pbs, log_r
     else:
-        return loss.mean()
+        return loss
 
 
-def bwd_tb(initial_state, gfn: GFN, log_reward_fn, exploration_std=None):
+def bwd_tb(final_states, gfn: GFN, log_reward_fn, exploration_std=None):
     states, log_pfs, log_pbs = gfn.get_backward_trajectory(
-        initial_state,
+        final_states,
         exploration_schedule=exploration_std,
     )
 
@@ -35,8 +58,8 @@ def bwd_tb(initial_state, gfn: GFN, log_reward_fn, exploration_std=None):
     with torch.no_grad():
         log_r = log_reward_fn(states[:, -1]).detach()
 
-    loss = 0.5 * ((log_pfs.sum(-1) + log_Z - log_pbs.sum(-1) - log_r) ** 2)
-    return loss.mean()
+    loss = trajectory_balance_loss(log_pfs, log_pbs, log_Z, log_r)
+    return loss
 
 
 def fwd_tb_avg(
@@ -54,13 +77,12 @@ def fwd_tb_avg(
     if return_exp:
         return 0.5 * (loss**2).mean(), states, log_pfs, log_pbs, log_r
     else:
-
         return 0.5 * (loss**2).mean()
 
 
-def bwd_tb_avg(initial_state, gfn: GFN, log_reward_fn, exploration_std=None):
+def bwd_tb_avg(final_states, gfn: GFN, log_reward_fn, exploration_std=None):
     states, log_pfs, log_pbs = gfn.get_backward_trajectory(
-        initial_state, exploration_schedule=exploration_std
+        final_states, exploration_schedule=exploration_std
     )
     with torch.no_grad():
         log_r = log_reward_fn(states[:, -1]).detach()
@@ -78,49 +100,14 @@ def db(initial_state, gfn: GFN, log_reward_fn, exploration_std=None, return_exp=
     log_fs = gfn.get_flow_from_trajectory(states)
 
     with torch.no_grad():
-        log_fs[:, -1] = log_reward_fn(states[:, -1]).detach()
+        log_reward = log_reward_fn(states[:, -1]).detach()
 
-    loss = 0.5 * ((log_pfs + log_fs[:, :-1] - log_pbs - log_fs[:, 1:]) ** 2).sum(-1)
-
-    if return_exp:
-        return loss.mean(), states, log_pfs, log_pbs, log_fs[:, -1]
-    else:
-        return loss.mean()
-
-
-def annealed_db(
-    initial_state, gfn: GFN, log_reward_fn, exploration_std=None, return_exp=False
-):
-    # Generate forward trajectory.
-    states, log_pfs, log_pbs = gfn.get_forward_trajectory(
-        initial_state, exploration_schedule=exploration_std
-    )
-
-    logZ_ratio = gfn.logZ_ratio
-
-    def interpolated_log_reward_fn(states):
-        time = torch.linspace(0, 1, gfn.trajectory_length + 1, device=gfn.device)
-
-        # Prior is standard normal gaussian.
-        prior_log_reward = -0.5 * (
-            torch.log(torch.tensor(2 * torch.pi, device=gfn.device))
-            - (states**2).sum(-1)
-        )
-        log_reward = log_reward_fn(states)
-
-        return (1 - time) * prior_log_reward + time * log_reward
-
-    with torch.no_grad():
-        log_r_t = interpolated_log_reward_fn(states)
-
-    loss = 0.5 * (
-        (log_pfs + logZ_ratio + log_r_t[:, :-1] - log_pbs - log_r_t[:, 1:]) ** 2
-    ).sum(-1)
+    loss = detailed_balance_loss(log_pfs, log_pbs, log_fs, log_reward)
 
     if return_exp:
-        return loss.mean(), states, log_pfs, log_pbs, log_r_t
+        return loss, states, log_pfs, log_pbs, log_fs[:, -1]
     else:
-        return loss.mean()
+        return loss
 
 
 def subtb(
@@ -171,9 +158,9 @@ def subtb(
         ).sum()
 
 
-def bwd_mle(samples, gfn: GFN, log_reward_fn, exploration_std=None):
+def bwd_mle(final_states, gfn: GFN, log_reward_fn, exploration_std=None):
     states, log_pfs, log_pbs = gfn.get_backward_trajectory(
-        samples, exploration_schedule=exploration_std
+        final_states, exploration_schedule=exploration_std
     )
     loss = -log_pfs.sum(-1)
     return loss.mean()

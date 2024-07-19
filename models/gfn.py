@@ -90,13 +90,12 @@ class GFN(SamplerModel):
         # 1 - pb_scale_range < (backward correction) < 1 + pb_scale_range
         self.pb_scale_range = pb_scale_range
 
-        # Constant noise per trajectory.
+        # coefficient for noise.
         self.pf_std_per_traj = np.sqrt(t_scale)
 
     def split_params(self, tensor):
         mean, logvar = gaussian_params(tensor)
         if not self.learned_variance:
-            # If you don't want to learn variance,
             # mask the model output and set the variance as constant.
             logvar = torch.zeros_like(logvar)
         else:
@@ -116,7 +115,6 @@ class GFN(SamplerModel):
         encoded_time = self.time_encoder(time).repeat(batch_size, 1)
         encoded_state = self.state_encoder(state)
 
-        # Each chunk (batch_size, sample_dim), (batch_size, sample_dim) represents mean and log variance.
         mean_and_logvar = self.forward_model(encoded_state, encoded_time)
 
         # Langevin parametrization trick, scale mean of forward density.
@@ -129,7 +127,6 @@ class GFN(SamplerModel):
                     grad_log_reward, -self.lgv_clip, self.lgv_clip
                 )
 
-            # TODO: Depends on architecture (e.g., PIS or not), langevin scaler takes different input.
             # Ad-hoc implementation for now. Need to be refactored.
             if self.langevin_scaler_is_PIS:
                 scale = self.langevin_scaler(time)
@@ -258,9 +255,7 @@ class GFN(SamplerModel):
         return torch.zeros(batch_size, self.sample_dim, device=self.device)
 
     def add_more_exploration(self, log_var: torch.Tensor, exploration_std: float):
-        if exploration_std is None:
-            pflogvars_sample = log_var
-        elif exploration_std <= 0.0:
+        if exploration_std <= 0.0:
             # For weired value of exploration_std, we don't add exploration noise.
             # But why detach...?
             pflogvars_sample = log_var.detach()
@@ -316,3 +311,6 @@ class GFN(SamplerModel):
         else:
             flow = self.get_flow_from_trajectory(trajectory)
             return flow[:, 0]
+
+    def get_logZ_ratio(self):
+        return self.logZ_ratio

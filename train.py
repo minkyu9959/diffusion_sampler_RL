@@ -1,6 +1,8 @@
 import os
+import random
 
 import torch
+import numpy as np
 
 import hydra
 from hydra.utils import instantiate
@@ -9,22 +11,17 @@ from omegaconf import DictConfig, OmegaConf
 
 import wandb
 
-from train.utils import (
-    set_seed,
+from trainer.utils import (
     check_config_and_set_read_only,
-    get_energy_function,
-    get_model,
     set_name_from_config,
 )
 
 from energy import BaseEnergy
-from train.trainer import BaseTrainer
+from trainer import BaseTrainer
 
 
 def train(cfg: DictConfig, model: torch.nn.Module, energy_function: BaseEnergy):
-
-    # Instantiate the trainer.
-    trainer = instantiate(
+    trainer: BaseTrainer = instantiate(
         cfg.train.trainer,
         model=model,
         energy_function=energy_function,
@@ -35,7 +32,7 @@ def train(cfg: DictConfig, model: torch.nn.Module, energy_function: BaseEnergy):
     trainer.train()
 
 
-@hydra.main(version_base="1.3", config_path="../configs", config_name="main.yaml")
+@hydra.main(version_base="1.3", config_path="./configs", config_name="main.yaml")
 def main(cfg: DictConfig) -> None:
     """
     Main entry point for training.
@@ -64,12 +61,38 @@ def main(cfg: DictConfig) -> None:
         entity="dywoo1247",
         config=cfg_dict,
         name=experiment_name,
+        group=cfg.wandb.get("group"),
     )
 
-    # Train strats here.
     train(cfg, model, energy_function)
 
     wandb.finish()
+
+
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    np.random.seed(seed)
+
+
+def get_energy_function(cfg: DictConfig) -> BaseEnergy:
+    energy_function = instantiate(cfg.energy, device=cfg.device)
+
+    return energy_function
+
+
+def get_model(cfg: DictConfig, energy_function: BaseEnergy) -> torch.nn.Module:
+    model = instantiate(
+        cfg.model,
+        device=torch.device(cfg.device),
+        energy_function=energy_function,
+    )
+
+    return model
 
 
 if __name__ == "__main__":

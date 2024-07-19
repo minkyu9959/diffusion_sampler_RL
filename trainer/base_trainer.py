@@ -12,7 +12,7 @@ from energy import BaseEnergy
 from buffer import *
 
 from metrics import compute_all_metrics, add_prefix_to_dict_key
-from train.utils import save_model, get_experiment_name, draw_sample_plot
+from trainer.utils import save_model, get_experiment_name, draw_sample_plot
 
 
 class BaseTrainer(abc.ABC):
@@ -76,9 +76,9 @@ class BaseTrainer(abc.ABC):
         )
 
         if self.train_end:
-            add_prefix_to_dict_key("final_eval/", metrics)
+            metrics = add_prefix_to_dict_key("final_eval/", metrics)
         else:
-            add_prefix_to_dict_key("eval/", metrics)
+            metrics = add_prefix_to_dict_key("eval/", metrics)
 
         plot_filename_prefix = get_experiment_name()
         plot_sample_size = self.eval_cfg.plot_sample_size
@@ -105,7 +105,7 @@ class BaseTrainer(abc.ABC):
 
         # Traininig
         self.model.train()
-        for epoch in trange(self.max_epoch + 1):
+        for epoch in (epochs := trange(self.max_epoch + 1)):
             self.current_epoch = epoch
 
             metrics["train/loss"] = self.train_step()
@@ -116,6 +116,13 @@ class BaseTrainer(abc.ABC):
 
             if self.must_save(epoch):
                 self.save_model()
+
+            epochs.set_postfix(
+                train_loss=metrics["train/loss"],
+                logZ_learned=metrics.get("eval/log_Z_learned").item(),
+                logZ_reweighted=metrics.get("eval/log_Z_reweighted").item(),
+                logZ_lower_bound=metrics.get("eval/log_Z_lower_bound").item(),
+            )
 
         # Final evaluation and save model
         metrics.update(self.eval_step())
