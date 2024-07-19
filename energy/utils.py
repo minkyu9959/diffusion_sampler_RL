@@ -1,5 +1,4 @@
 from typing import Callable, Optional
-import itertools
 
 import torch
 from matplotlib.axes import Axes
@@ -11,18 +10,13 @@ def get_points_on_2D_grid(
     grid_lower_lim, grid_upper_lim = bounds
 
     x = torch.linspace(
-        grid_lower_lim,
-        grid_upper_lim,
-        grid_width_n_points,
+        grid_lower_lim, grid_upper_lim, grid_width_n_points, device=device
     )
     y = torch.linspace(
-        grid_lower_lim,
-        grid_upper_lim,
-        grid_width_n_points,
+        grid_lower_lim, grid_upper_lim, grid_width_n_points, device=device
     )
 
-    points = torch.tensor(list(itertools.product(x, y)))
-
+    points = torch.cartesian_prod(x, y)
     return points
 
 

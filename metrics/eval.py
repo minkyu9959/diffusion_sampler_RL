@@ -18,7 +18,7 @@ GROUND_TRUTH_SAMPLE = None
 
 
 def add_prefix_to_dict_key(prefix: str, dict: dict) -> dict:
-    return {f"{prefix}/name": dict[name] for name in dict}
+    return {f"{prefix}{name}": dict[name] for name in dict}
 
 
 @torch.no_grad()
@@ -37,7 +37,9 @@ def compute_all_metrics(
     ) and energy_function.can_sample
 
     if do_resample or resample_is_needed:
-        GROUND_TRUTH_SAMPLE = energy_function.sample(batch_size=eval_data_size)
+        GROUND_TRUTH_SAMPLE = energy_function.sample(batch_size=eval_data_size).to(
+            dtype=torch.float32
+        )
 
     # Evaluate model
     metrics = dict()

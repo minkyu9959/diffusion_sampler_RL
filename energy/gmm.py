@@ -5,6 +5,7 @@ import torch.distributions as D
 from torch.distributions.mixture_same_family import MixtureSameFamily
 
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 from matplotlib.axes import Axes
 
 from .base_energy import BaseEnergy
@@ -78,14 +79,14 @@ class GaussianMixture(BaseEnergy):
             log_prob_min=log_prob_min,
         )
 
-    def plot_sample(self, sample: torch.Tensor, ax: Axes, alpha: float = 0.5):
+    def plot_sample(self, sample: torch.Tensor, ax: Axes, alpha: float = 0.3):
         """
         Draw sample plot on 2D.
         This function returns scatter object.
         """
         return draw_2D_sample(sample, ax, self.plotting_bounds, alpha)
 
-    def plot_ground_truth_sample(self, ax: Axes, alpha: float = 0.5):
+    def plot_ground_truth_sample(self, ax: Axes, alpha: float = 0.3):
         """
         Draw ground truth sample plot on 2D.
         This function returns scatter object.
@@ -114,6 +115,27 @@ class GaussianMixture(BaseEnergy):
 
         return fig, axs
 
+    def make_trajectory_plot(self, trajectory: torch.Tensor):
+        """
+        Make figure containing trajectory from the model.
+
+        Args:
+            trajectory (torch.Tensor): sample generation trajectory from model.
+
+        Return:
+            animation, fig, axs: matplotlib animation, figure and axes object that is created.
+        """
+        fig, ax = plt.subplots(1, 1, figsize=(12, 12))
+
+        self.plot_contours(ax)
+
+        def update(frame: int):
+            self.plot_sample(trajectory[:, frame, :], ax)
+
+        animation = FuncAnimation(fig, update, frames=trajectory.size(1), interval=10)
+
+        return animation, fig, ax
+
 
 class GMM9(GaussianMixture):
     def __init__(self, device: str, dim: int, scale: float = 0.5477222):
@@ -128,7 +150,7 @@ class GMM9(GaussianMixture):
             mode_list=mode_list,
             dim=dim,
             scale=scale,
-            plotting_bounds=(-8.0, 8.0),
+            plotting_bounds=(-10.0, 10.0),
         )
 
 
@@ -149,7 +171,7 @@ class GMM25(GaussianMixture):
             mode_list=mode_list,
             dim=dim,
             scale=scale,
-            plotting_bounds=(-15.0, 15.0),
+            plotting_bounds=(-20.0, 20.0),
         )
 
 
