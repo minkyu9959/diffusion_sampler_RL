@@ -1,3 +1,7 @@
+"""
+GFN model implemented in gfn-diffusion repository.
+"""
+
 import torch
 import math
 import numpy as np

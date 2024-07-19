@@ -154,7 +154,7 @@ class SamplerModel(torch.nn.Module, metaclass=abc.ABCMeta):
                 next_state, cur_state, pf_params
             )
 
-            # When cur_idx == 0, p_B(dt -> 0) is deterministic. No need to calculate.
+            # When cur_idx == 0, p_B(dt -> 0) is deterministic. We don't have to calculate.
             if cur_idx > 0:
                 pb_params = self.get_backward_params(next_state, next_time)
                 logpb[:, cur_idx] = self.get_backward_logprob(
