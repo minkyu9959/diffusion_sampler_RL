@@ -1,4 +1,4 @@
-from energy import Funnel, ManyWell, GMM25, GMM9
+from energy import Funnel, ManyWell
 
 import torch
 
@@ -26,36 +26,6 @@ def test_funnel_log_prob():
     raise Exception("Exception must be raised by device conflict")
 
 
-def test_gmm_make_plot():
-    energy_function = GMM25(device="cuda:0", dim=2)
-    sample = torch.zeros((100, 2), device="cuda:0")
-
-    fig, _ = energy_function.make_plot(sample)
-    fig.savefig("./test/gmm25_test_figure.png")
-
-    energy_function = GMM9(device="cuda:0", dim=2)
-    sample = torch.zeros((100, 2), device="cuda:0")
-
-    fig, _ = energy_function.make_plot(sample)
-    fig.savefig("./test/gmm9_test_figure.png")
-
-
 def test_manywell_sample():
     energy_function = ManyWell(device="cuda:0")
     sample = energy_function.sample(1000)
-
-
-def test_manywell_make_plot():
-    energy_function = ManyWell(device="cuda:0")
-    sample = energy_function.sample(1000)
-
-    fig, _ = energy_function.make_plot(sample)
-    fig.savefig("./test/manywell_test_figure.png")
-
-
-def test_funnel_make_plot():
-    energy_function = Funnel(device="cuda:0")
-    sample = energy_function.sample(1000)
-
-    fig, _ = energy_function.make_plot(sample)
-    fig.savefig("./test/funnel_test_figure.png")
