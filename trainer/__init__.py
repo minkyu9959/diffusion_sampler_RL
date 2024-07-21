@@ -4,7 +4,6 @@ from .utils import (
     set_name_from_config,
     get_experiment_name,
     fig_to_image,
-    draw_sample_plot,
     save_model,
     make_interpolated_energy,
 )

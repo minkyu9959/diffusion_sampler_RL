@@ -8,11 +8,11 @@ import wandb
 
 from omegaconf import DictConfig
 
-from energy import BaseEnergy
+from energy import BaseEnergy, Plotter
 from buffer import *
 
 from metrics import compute_all_metrics, add_prefix_to_dict_key
-from trainer.utils import save_model, get_experiment_name, draw_sample_plot
+from trainer.utils import save_model, get_experiment_name, fig_to_image
 
 
 class BaseTrainer(abc.ABC):
@@ -34,6 +34,8 @@ class BaseTrainer(abc.ABC):
     ):
         self.model = model
         self.energy_function = energy_function
+        self.plotter = Plotter(energy_function, **eval_cfg.plot)
+
         self.train_cfg = train_cfg
         self.eval_cfg = eval_cfg
 
@@ -80,21 +82,37 @@ class BaseTrainer(abc.ABC):
         else:
             metrics = add_prefix_to_dict_key("eval/", metrics)
 
-        plot_filename_prefix = get_experiment_name()
-        plot_sample_size = self.eval_cfg.plot_sample_size
-        metrics.update(
-            draw_sample_plot(
-                energy=self.energy_function,
-                model=self.model,
-                plot_prefix=plot_filename_prefix,
-                plot_sample_size=plot_sample_size,
-            )
-        )
+        metrics.update(self.make_plot())
 
         # Prevent too much plt objects from lasting
         plt.close("all")
 
         return metrics
+
+    def make_plot(self):
+        """
+        Generate sample from model and plot it using energy function's make_plot method.
+        If energy function does not have make_plot method, return empty dict.
+
+        If you want to add more visualization, you can override this method.
+
+        Returns:
+            dict: dictionary that has wandb Image objects as value
+        """
+        plot_filename_prefix = get_experiment_name()
+        plot_sample_size = self.eval_cfg.plot_sample_size
+
+        model = self.model
+
+        samples = model.sample(batch_size=plot_sample_size)
+
+        fig, _ = self.plotter.make_plot(samples)
+
+        fig.savefig(f"{plot_filename_prefix}plot.pdf", bbox_inches="tight")
+
+        return {
+            "visualization/plot": wandb.Image(fig_to_image(fig)),
+        }
 
     def train(self):
         # Initialize some variables (e.g., optimizer, buffer, frequently used values)
@@ -105,7 +123,7 @@ class BaseTrainer(abc.ABC):
 
         # Traininig
         self.model.train()
-        for epoch in (epochs := trange(self.max_epoch + 1)):
+        for epoch in trange(self.max_epoch + 1):
             self.current_epoch = epoch
 
             metrics["train/loss"] = self.train_step()
@@ -116,13 +134,6 @@ class BaseTrainer(abc.ABC):
 
             if self.must_save(epoch):
                 self.save_model()
-
-            epochs.set_postfix(
-                train_loss=metrics["train/loss"],
-                logZ_learned=metrics.get("eval/log_Z_learned").item(),
-                logZ_reweighted=metrics.get("eval/log_Z_reweighted").item(),
-                logZ_lower_bound=metrics.get("eval/log_Z_lower_bound").item(),
-            )
 
         # Final evaluation and save model
         metrics.update(self.eval_step())

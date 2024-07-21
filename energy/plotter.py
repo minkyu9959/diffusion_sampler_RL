@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.animation import FuncAnimation
 
+from omegaconf import DictConfig
+
 
 from .base_energy import BaseEnergy, HighDimensionalEnergy
 
@@ -21,6 +23,7 @@ class Plotter:
         plotting_bounds=(-10.0, 10.0),
         projection_dims: Optional[list[tuple[int, int]]] = None,
         fig_size: Optional[tuple[float, float]] = (12.0, 6.0),
+        **kwargs,
     ):
         self.energy_function = energy_function
         self.need_projection = isinstance(energy_function, HighDimensionalEnergy)

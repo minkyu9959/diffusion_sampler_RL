@@ -94,40 +94,6 @@ def fig_to_image(fig):
     )
 
 
-def draw_sample_plot(
-    energy: BaseEnergy,
-    model: torch.nn.Module,
-    plot_prefix: str,
-    plot_sample_size: int,
-) -> dict:
-    """
-    Generate sample from model and plot it using energy function's make_plot method.
-    If energy function does not have make_plot method, return empty dict.
-
-    Args:
-        energy (BaseEnergy): energy function which model learn to sample from
-        model (torch.nn.Module): learned sampler model
-        plot_prefix (str): plot file prefix (directory path and file name prefix)
-        plot_sample_size (int): number of sample to plot
-
-    Returns:
-        dict: dictionary that has wandb Image objects as value
-    """
-
-    if not hasattr(energy, "make_plot"):
-        return {}
-
-    samples = model.sample(batch_size=plot_sample_size)
-
-    fig, _ = energy.make_plot(samples)
-
-    fig.savefig(f"{plot_prefix}plot.pdf", bbox_inches="tight")
-
-    return {
-        "visualization/plot": wandb.Image(fig_to_image(fig)),
-    }
-
-
 def save_model(model: torch.nn.Module, is_final: bool = False):
     final = "_final" if is_final else ""
     torch.save(model.state_dict(), f"{NAME}model{final}.pt")
