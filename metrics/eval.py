@@ -10,6 +10,7 @@ from models.base_model import SamplerModel
 from .density_based_metric import (
     estimate_mean_log_likelihood,
     log_partition_function,
+    evidence_upper_bound,
 )
 
 
@@ -57,6 +58,8 @@ def compute_all_metrics(
         metrics["mean_log_likelihood"] = estimate_mean_log_likelihood(
             GROUND_TRUTH_SAMPLE, model
         )
+
+        metrics["EUBO"] = evidence_upper_bound(model, GROUND_TRUTH_SAMPLE)
 
     # Estimate log partition value.
     metrics.update(log_partition_function(model, sample_size=eval_data_size))

@@ -61,3 +61,25 @@ def estimate_mean_log_likelihood(
     log_weight = (log_pfs.sum(-1) - log_pbs.sum(-1)).view(batch_size, num_evals, -1)
 
     return log_mean_exp(log_weight, dim=1).mean()
+
+
+@torch.no_grad()
+def evidence_upper_bound(model: SamplerModel, ground_truth_sample: torch.Tensor):
+    """
+    Estimate evidence upper bound with ground truth sample.
+
+    Args:
+        model: SamplerModel
+        ground_truth_sample: torch.Tensor
+            Ground truth sample from energy function.
+    """
+
+    log_reward_fn = model.energy_function.log_reward
+
+    _, log_pfs, log_pbs = model.get_backward_trajectory(ground_truth_sample)
+
+    log_reward = log_reward_fn(ground_truth_sample)
+
+    log_weight = log_reward + log_pbs.sum(-1) - log_pfs.sum(-1)
+
+    return log_weight.mean()
