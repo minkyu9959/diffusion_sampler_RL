@@ -166,7 +166,7 @@ def bwd_mle(final_states, gfn: GFN, log_reward_fn, exploration_std=None):
     return loss.mean()
 
 
-def pis(initial_state, gfn: GFN, log_reward_fn, exploration_std=None):
+def pis(initial_state, gfn: GFN, log_reward_fn, exploration_std=None, return_exp=False):
     states, log_pfs, log_pbs = gfn.get_forward_trajectory(
         initial_state, exploration_schedule=exploration_std, stochastic_backprop=True
     )
@@ -175,4 +175,7 @@ def pis(initial_state, gfn: GFN, log_reward_fn, exploration_std=None):
 
     normalization_constant = float(1 / initial_state.shape[-1])
     loss = normalization_constant * (log_pfs.sum(-1) - log_pbs.sum(-1) - log_r)
-    return loss.mean()
+    if return_exp:
+        return loss.mean(), states, log_pfs, log_pbs, log_r
+    else:
+        return loss.mean()

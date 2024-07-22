@@ -112,6 +112,9 @@ def get_gfn_forward_loss(
         subtb_loss_fn = partial(coeff_matrix=coeff_matrix)
         return subtb_loss_fn
 
+    elif loss_type == "pis":
+        return pis
+
     else:
         return Exception("Invalid forward loss type")
 

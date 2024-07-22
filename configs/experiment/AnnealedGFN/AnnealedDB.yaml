@@ -4,16 +4,27 @@ wandb:
   group: "AnnealedGFN"
 
 defaults:
-  - override /energy: 9gmm
+  - override /energy: manywell
   - override /model: GFN-PIS
   - override /train: AnnealedGFNTrainer
 
 model:
-  t_scale: 5.0
-  langevin_scaler: null
+  t_scale: 1.0
+
   flow_model: null
 
-train:
-  epochs: 25000
-  local_search: null
+  langevin_scaler:
+    out_dim: 1
 
+  learned_variance: true
+
+train:
+  train_mode: fwd
+  bwd_loss: null
+
+  # exploratory: true
+  # exploration_factor: 0.2
+  # exploration_wd: true
+
+  epochs: 10000
+  local_search: null

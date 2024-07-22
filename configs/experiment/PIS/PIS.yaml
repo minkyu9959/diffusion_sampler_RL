@@ -1,0 +1,20 @@
+# @package _global_
+
+wandb:
+  group: "PIS"
+
+defaults:
+  - override /model: GFN-PIS
+
+model:
+  t_scale: 1.0
+
+  backward_model: null
+  flow_model: null
+
+train:
+  train_mode: fwd
+  fwd_loss: pis
+
+  exploratory: false
+  local_search: null
