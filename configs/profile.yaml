@@ -4,7 +4,7 @@ device: "cuda:0"
 
 defaults:
   - energy: manywell
-  - model: GFN
+  - model: GFN-PIS
   - _self_
 
 model:
@@ -12,9 +12,6 @@ model:
 
 energy:
   device: ${device}
-
-wandb:
-  project: "GFN Energy Debug"
 
 name: ???
 

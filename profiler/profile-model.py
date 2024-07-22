@@ -5,7 +5,7 @@ import hydra
 
 from omegaconf import DictConfig
 
-from train.utils import (
+from train import (
     set_seed,
     get_energy_function,
     get_model,
@@ -38,9 +38,9 @@ def profile(cfg: DictConfig) -> None:
             harmonics_dim=64,
             t_dim=64,
             energy_function=energy_function,
-            langevin=False,
+            langevin=True,
             pis_architectures=False,
-            learn_pb=False,
+            learn_pb=True,
             zero_init=False,
             clipping=True,
             device=DEVICE,
