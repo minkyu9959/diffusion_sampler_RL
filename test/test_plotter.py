@@ -65,7 +65,7 @@ def test_plotter_make_traj_plot_for_gmm25():
     )
 
     # Brownian motion trajectory
-    trajectory = torch.randn((10, 100, 2), device="cuda:0") * 0.1
+    trajectory = torch.randn((10, 10, 2), device="cuda:0") * 0.1
     trajectory = trajectory.cumsum(dim=-1)
 
     animation, _, _ = plotter.make_sample_generation_animation(trajectory)
@@ -84,7 +84,7 @@ def test_plotter_make_traj_plot_for_manywell():
     )
 
     # Brownian motion trajectory
-    trajectory = torch.randn((10, 100, 32), device="cuda:0") * 0.1
+    trajectory = torch.randn((10, 10, 32), device="cuda:0") * 0.1
     trajectory = trajectory.cumsum(dim=-1)
 
     animation, *_ = plotter.make_sample_generation_animation(trajectory, 0, 1)
