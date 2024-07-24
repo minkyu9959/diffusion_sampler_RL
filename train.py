@@ -61,6 +61,7 @@ def main(cfg: DictConfig) -> None:
         entity="dywoo1247",
         config=cfg_dict,
         name=experiment_name,
+        tags=cfg.wandb.get("tags"),
         group=cfg.wandb.get("group"),
     )
 

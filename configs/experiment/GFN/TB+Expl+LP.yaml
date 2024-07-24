@@ -1,15 +1,12 @@
 # @package _global_
 
 wandb:
-  project: "Diffusion-sampler Reproduce"
-  group: "GFN/TB+Expl+LP"
+  tags: ["GFN-PIS", "TB", "Exploratory", "LP"]
 
 defaults:
   - override /model: GFN-PIS
 
 model:
-  t_scale: 1.0
-
   backward_model: null
   flow_model: null
 
@@ -22,9 +19,12 @@ train:
 
   train_mode: fwd
   fwd_loss: tb
+  bwd_loss: null
 
   exploratory: true
   exploration_wd: true
   exploration_factor: 0.2
+
+  buffer: null
 
   local_search: null

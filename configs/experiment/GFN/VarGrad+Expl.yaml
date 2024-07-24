@@ -1,8 +1,7 @@
 # @package _global_
 
 wandb:
-  project: "Diffusion-sampler Reproduce"
-  group: "GFN/VarGrad+Expl"
+  tags: ["GFN-PIS", "VarGrad", "Exploratory"]
 
 defaults:
   - override /model: GFN-PIS

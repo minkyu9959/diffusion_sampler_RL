@@ -74,7 +74,13 @@ def get_GFN_optimizer(
     return gfn_optimizer
 
 
-def get_buffer(buffer_cfg: DictConfig, energy_function: BaseEnergy) -> BaseBuffer:
+def get_buffer(
+    buffer_cfg: Optional[DictConfig], energy_function: BaseEnergy
+) -> Optional[BaseBuffer]:
+
+    if buffer_cfg is None:
+        return None
+
     if buffer_cfg.prioritized:
         buffer_class = PrioritizedReplayBuffer
     else:

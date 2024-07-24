@@ -5,6 +5,8 @@ wandb
 results
 results_pis_architectures
 
+multirun
+
 .env
 .vscode
 *.png

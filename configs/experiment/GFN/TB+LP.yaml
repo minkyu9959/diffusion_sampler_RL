@@ -1,21 +1,27 @@
 # @package _global_
 
 wandb:
-  tags: ["PIS"]
+  tags: ["GFN-PIS", "TB", "On-policy", "LP"]
 
 defaults:
   - override /model: GFN-PIS
 
 model:
-  t_scale: 1.0
-
   backward_model: null
   flow_model: null
-  langevin_scaler: null
+
+  langevin_scaler:
+    out_dim: 1
 
 train:
+  epochs: 10000
+
   train_mode: fwd
-  fwd_loss: pis
+  fwd_loss: tb
+  bwd_loss: null
 
   exploratory: false
+
+  buffer: null
+
   local_search: null

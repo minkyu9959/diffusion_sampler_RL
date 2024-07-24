@@ -1,7 +1,7 @@
 # @package _global_
 
 wandb:
-  tags: ["PIS"]
+  tags: ["PIS", "LP"]
 
 defaults:
   - override /model: GFN-PIS
@@ -11,9 +11,13 @@ model:
 
   backward_model: null
   flow_model: null
-  langevin_scaler: null
+
+  # LP per dimension vs. Scalar LP
+  # langevin_scaler:
+  #   out_dim: 1
 
 train:
+  epochs: 10000
   train_mode: fwd
   fwd_loss: pis
 
