@@ -1,0 +1,21 @@
+# @package _global_
+
+wandb:
+  tags: ["AnnealedGFN"]
+
+defaults:
+  - override /model: GFN-PIS
+  - override /train: AnnealedGFNTrainer
+
+model:
+  flow_model: null
+
+  langevin_scaler:
+    out_dim: 1
+
+  learned_variance: false
+
+train:
+  train_mode: both_ways
+
+  epochs: 10000

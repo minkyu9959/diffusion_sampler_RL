@@ -16,7 +16,8 @@ from trainer.utils import (
     set_name_from_config,
 )
 
-from energy import BaseEnergy
+from energy import BaseEnergy, get_energy_function
+from models import get_model
 from trainer import BaseTrainer
 
 
@@ -78,22 +79,6 @@ def set_seed(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     np.random.seed(seed)
-
-
-def get_energy_function(cfg: DictConfig) -> BaseEnergy:
-    energy_function = instantiate(cfg.energy, device=cfg.device)
-
-    return energy_function
-
-
-def get_model(cfg: DictConfig, energy_function: BaseEnergy) -> torch.nn.Module:
-    model = instantiate(
-        cfg.model,
-        device=torch.device(cfg.device),
-        energy_function=energy_function,
-    )
-
-    return model
 
 
 if __name__ == "__main__":
