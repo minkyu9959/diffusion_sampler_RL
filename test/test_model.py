@@ -2,7 +2,9 @@ from hydra import compose, initialize
 
 import torch
 
-from train import get_energy_function, get_model, set_seed
+from train import set_seed
+from models import get_model
+from energy import get_energy_function
 
 from models import GFN
 

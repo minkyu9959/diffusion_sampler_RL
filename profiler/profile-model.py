@@ -5,16 +5,9 @@ import hydra
 
 from omegaconf import DictConfig
 
-from train import (
-    set_seed,
-    get_energy_function,
-    get_model,
-)
-
-from models import SamplerModel
-from models.old_gfn import GFN
-from energy import BaseEnergy
-
+from train import set_seed
+from models import get_model, SamplerModel, OldGFN
+from energy import BaseEnergy, get_energy_function
 
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 
@@ -31,7 +24,7 @@ def profile(cfg: DictConfig) -> None:
     if cfg.name == "Sampler":
         model: SamplerModel = get_model(cfg, energy_function).to(cfg.device)
     elif cfg.name == "OldGFN":
-        model = GFN(
+        model = OldGFN(
             dim=energy_function.data_ndim,
             s_emb_dim=64,
             hidden_dim=64,
