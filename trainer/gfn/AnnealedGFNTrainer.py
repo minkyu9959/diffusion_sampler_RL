@@ -3,11 +3,12 @@ Train code for Annealed GFN.
 """
 
 import torch
+import numpy as np
 
 from models import GFN
 from buffer import *
 
-from trainer.utils import make_interpolated_energy
+from energy import AnnealedEnergy
 from trainer.gfn.GFNTrainer import GFNTrainer
 
 from .utils.langevin import langevin_dynamics
@@ -16,7 +17,9 @@ from .utils.langevin import langevin_dynamics
 class AnnealedGFNTrainer(GFNTrainer):
     def initialize(self):
         super().initialize()
-        self.interpolated_energy = make_interpolated_energy(self.energy_function)
+        self.annealed_energy = AnnealedEnergy(
+            self.energy_function, "gaussian", log_var=np.log(9.0)
+        )
 
     def set_training_mode(self):
         """
@@ -115,7 +118,7 @@ class AnnealedGFNTrainer(GFNTrainer):
     ):
         times = torch.linspace(0, 1, trajectory.size(1), device=trajectory.device)
 
-        log_reward_t = -self.interpolated_energy(trajectory, times)
+        log_reward_t = -self.annealed_energy.energy(times, trajectory)
 
         loss = 0.5 * (
             (

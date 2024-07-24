@@ -5,5 +5,4 @@ from .utils import (
     get_experiment_name,
     fig_to_image,
     save_model,
-    make_interpolated_energy,
 )
