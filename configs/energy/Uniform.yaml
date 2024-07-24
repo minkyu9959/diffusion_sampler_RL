@@ -1,0 +1,6 @@
+
+_target_: energy.simple_energy.UniformEnergy
+
+dim: ???
+
+max_support: 30

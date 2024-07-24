@@ -39,9 +39,11 @@ class GaussianMixture(BaseEnergy):
         mix = D.Categorical(torch.ones(num_modes, device=self.device))
         self.gmm = MixtureSameFamily(mix, comp)
 
+    @BaseEnergy._match_device
     def energy(self, x: torch.Tensor) -> torch.Tensor:
         return -self.gmm.log_prob(x)
 
+    @BaseEnergy._match_device
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         return self.gmm.log_prob(x)
 

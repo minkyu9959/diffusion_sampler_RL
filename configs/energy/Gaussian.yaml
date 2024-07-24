@@ -1,0 +1,6 @@
+
+_target_: energy.simple_energy.GaussianEnergy
+
+dim: ???
+
+logvar: 0.0

@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import torch.distributions as D
 
-from .base_energy import HighDimensionalEnergy
+from .base_energy import HighDimensionalEnergy, BaseEnergy
 
 
 class Funnel(HighDimensionalEnergy):
@@ -45,6 +45,7 @@ class Funnel(HighDimensionalEnergy):
     def energy(self, x: torch.Tensor):
         return -self.log_prob(x)
 
+    @BaseEnergy._match_device
     def log_prob(self, x: torch.Tensor):
         dominant_x = x[..., 0]
         log_density_dominant = self.dominant_distribution.log_prob(dominant_x)  # (B, )
