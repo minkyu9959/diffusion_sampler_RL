@@ -33,6 +33,9 @@ class GaussianEnergy(BaseEnergy):
     def score(self, x: torch.Tensor):
         return -x / self.sigma
 
+    def log_prob(self, x: torch.Tensor):
+        return -self.energy(x) - self._ground_truth_logZ
+
 
 class UniformEnergy(BaseEnergy):
     logZ_is_available = False

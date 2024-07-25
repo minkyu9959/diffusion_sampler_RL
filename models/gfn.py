@@ -267,6 +267,12 @@ class GFN(SamplerModel):
     def generate_initial_state(self, batch_size: int) -> torch.Tensor:
         return torch.zeros(batch_size, self.sample_dim, device=self.device)
 
+    def get_logprob_initial_state(self, init_state: torch.Tensor) -> torch.Tensor:
+        assert (init_state == torch.zeros(self.sample_dim, device=self.device)).prod()
+
+        batch_dims = init_state.shape[:-1]
+        return torch.zeros(batch_dims, device=self.device)
+
     def add_more_exploration(self, log_var: torch.Tensor, exploration_std: float):
         if exploration_std <= 0.0:
             # For weired value of exploration_std, we don't add exploration noise.

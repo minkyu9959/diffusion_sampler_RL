@@ -232,6 +232,9 @@ class CMCDSampler(SamplerModel):
     def generate_initial_state(self, batch_size: int) -> torch.Tensor:
         return self.prior_energy.sample(batch_size, device=self.device)
 
+    def get_logprob_initial_state(self, init_state: torch.Tensor) -> torch.Tensor:
+        return self.prior_energy.log_prob(init_state)
+
     def add_more_exploration(self, log_var: torch.Tensor, exploration_std: float):
         if exploration_std <= 0.0:
             # For weired value of exploration_std, we don't add exploration noise.

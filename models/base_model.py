@@ -58,6 +58,10 @@ class SamplerModel(torch.nn.Module, metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
+    def get_logprob_initial_state(self, init_state: torch.Tensor) -> torch.Tensor:
+        pass
+
+    @abc.abstractmethod
     def get_forward_params(self, state: torch.Tensor, time: float, **kwargs):
         """
         Get forward conditional density's parameters.
