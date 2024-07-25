@@ -31,7 +31,7 @@ class GaussianEnergy(BaseEnergy):
         return 0.5 * (x**2).sum(-1) / self.sigma
 
     def score(self, x: torch.Tensor):
-        return x / self.sigma
+        return -x / self.sigma
 
 
 class UniformEnergy(BaseEnergy):

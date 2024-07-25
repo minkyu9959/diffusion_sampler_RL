@@ -89,7 +89,7 @@ class BaseEnergy(abc.ABC):
             copy_x = x.detach().clone()
             copy_x.requires_grad = True
             with torch.enable_grad():
-                self.energy(copy_x).sum().backward()
+                (-self.energy(copy_x)).sum().backward()
                 grad_energy = copy_x.grad.data
             return grad_energy
 
@@ -120,21 +120,24 @@ class HighDimensionalEnergy(BaseEnergy):
         if not is_first_dim_valid or not is_second_dim_valid:
             raise Exception("Invalid projection dimension")
 
-        return torch.stack(
-            (x[..., first_dim], x[..., second_dim]), dim=-1, device=x.device
-        )
+        return x[..., (first_dim, second_dim)]
 
     def lift_from_2d(
         self, projected_x_2d: torch.Tensor, first_dim: int, second_dim: int
     ) -> torch.Tensor:
 
-        # make zero tensor
-        x = torch.zeros(
-            *projected_x_2d.shape[:-1], self.data_ndim, device=projected_x_2d.device
-        )
+        # Input must be (..., 2) shape tensor
+        if projected_x_2d.shape[-1] != 2:
+            raise Exception("Input tensor has invalid shape")
 
-        x[:, first_dim] = projected_x_2d[..., 0]
-        x[:, second_dim] = projected_x_2d[..., 1]
+        # Batch dimension = dimension without the last data dimension
+        batch_dims = projected_x_2d.shape[:-1]
+        device = projected_x_2d.device
+
+        # make zero tensor
+        x = torch.zeros(*batch_dims, self.data_ndim, device=device)
+
+        x[..., (first_dim, second_dim)] = projected_x_2d
 
         return x
 

@@ -3,7 +3,7 @@ from .funnel import Funnel
 from .many_well import ManyWell
 from .gmm import GaussianMixture, GMM9, GMM25, GMM40
 
-from .annealed_energy import AnnealedEnergy
+from .annealed_energy import AnnealedEnergy, AnnealedDensities
 from .simple_energy import GaussianEnergy, UniformEnergy
 
 from .plotter import Plotter

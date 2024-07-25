@@ -6,11 +6,11 @@ from typing import Callable, Optional
 
 import torch
 
+import numpy as np
+
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.animation import FuncAnimation
-
-from omegaconf import DictConfig
 
 
 from .base_energy import BaseEnergy, HighDimensionalEnergy
@@ -57,7 +57,11 @@ class Plotter:
 
             log_prob_func = log_prob_2D
         else:
-            log_prob_func = self.energy_function.log_prob
+
+            def log_prob(x: torch.Tensor) -> torch.Tensor:
+                return -self.energy_function.energy(x)
+
+            log_prob_func = log_prob
 
         return draw_2D_contour(
             ax,
@@ -96,6 +100,29 @@ class Plotter:
             self.plotting_bounds,
             self.alpha,
         )
+
+    def draw_vector_field(
+        self,
+        ax: Axes,
+        vecfield: Callable[[torch.Tensor], torch.Tensor],
+        device: str,
+    ):
+        """
+        Draw vector field quiver plot on 2D plot.
+        Here, given vf must be batch-support version.
+        """
+
+        X, Y = make_2D_meshgrid(self.plotting_bounds, self.grid_width_n_points // 20)
+
+        points = get_points_on_2D_grid(
+            self.plotting_bounds,
+            self.grid_width_n_points // 20,
+            device=device,
+        )
+
+        vectors = vecfield(points).detach()
+
+        return ax.quiver(X, Y, vectors[:, 0], vectors[:, 1])
 
     def draw_contour_and_ground_truth_sample(
         self,
@@ -193,6 +220,11 @@ class Plotter:
 def get_points_on_2D_grid(
     bounds: tuple, grid_width_n_points: int, device: Optional[str] = "cpu"
 ):
+    """
+    For points on the grid (bounds[0], bounds[1]) with n points at each side,
+    make the list of points on the grid whose shape are (n**2, 2).
+    """
+
     grid_lower_lim, grid_upper_lim = bounds
 
     x = torch.linspace(
@@ -207,6 +239,10 @@ def get_points_on_2D_grid(
 
 
 def make_2D_meshgrid(bounds: tuple, grid_width_n_points: int):
+    """
+    For points on the grid (bounds[0], bounds[1]) with n points at each side,
+    make meshgrid tensor X, Y whose shape are (n, n).
+    """
     grid_lower_lim, grid_upper_lim = bounds
 
     x = torch.linspace(
