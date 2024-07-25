@@ -130,7 +130,9 @@ class BaseTrainer(abc.ABC):
 
             if self.must_eval(epoch):
                 metrics.update(self.eval_step())
-                wandb.log(metrics, step=epoch)
+
+                if wandb.run is not None:
+                    wandb.log(metrics, step=epoch)
 
             if self.must_save(epoch):
                 self.save_model()
@@ -139,7 +141,8 @@ class BaseTrainer(abc.ABC):
         metrics.update(self.eval_step())
         self.save_model()
 
-        wandb.log(metrics)
+        if wandb.run is not None:
+            wandb.log(metrics)
 
     @property
     def train_end(self):
