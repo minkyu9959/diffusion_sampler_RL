@@ -1,13 +1,29 @@
 import torch
 import math
 
-from energy.base_energy import BaseEnergy
 from models.base_model import SamplerModel
 from models import GFN
 
 
 def log_mean_exp(x, dim=0):
     return x.logsumexp(dim) - math.log(x.shape[dim])
+
+
+def get_log_weight(
+    log_pfs: torch.Tensor,
+    log_pbs: torch.Tensor,
+    log_reward: torch.Tensor,
+    log_pf_0: torch.Tensor,
+):
+    assert log_pfs.shape == log_pbs.shape
+    assert (
+        log_pfs.shape[:-1] == log_pf_0.shape and log_pfs.shape[:-1] == log_reward.shape
+    )
+
+    log_pf_trajectory = log_pfs.sum(-1) + log_pf_0
+    log_pb_trajectory_given_sample = log_pbs.sum(-1)
+
+    return log_reward + log_pb_trajectory_given_sample - log_pf_trajectory
 
 
 @torch.no_grad()
@@ -24,6 +40,8 @@ def log_partition_function(model: SamplerModel, sample_size: int = 1000):
     log_reward_fn = model.energy_function.log_reward
     init_state = model.generate_initial_state(batch_size=sample_size)
 
+    log_pf_0 = model.get_logprob_initial_state(init_state)
+
     metrics = {}
 
     trajectory, log_pfs, log_pbs = model.get_forward_trajectory(init_state)
@@ -35,7 +53,8 @@ def log_partition_function(model: SamplerModel, sample_size: int = 1000):
 
     sample = trajectory[:, -1]
     log_reward = log_reward_fn(sample)
-    log_weight = log_reward + log_pbs.sum(-1) - log_pfs.sum(-1)
+
+    log_weight = get_log_weight(log_pfs, log_pbs, log_reward, log_pf_0)
 
     metrics["log_Z_reweighted"] = log_mean_exp(log_weight)
 
@@ -57,8 +76,15 @@ def estimate_mean_log_likelihood(
         .view(batch_size * num_evals, -1)
     )
 
-    _, log_pfs, log_pbs = model.get_backward_trajectory(ground_truth_sample)
-    log_weight = (log_pfs.sum(-1) - log_pbs.sum(-1)).view(batch_size, num_evals, -1)
+    trajectory, log_pfs, log_pbs = model.get_backward_trajectory(ground_truth_sample)
+    log_pf_0 = model.get_logprob_initial_state(trajectory[..., 0, :])
+
+    log_pf_trajectory = log_pf_0 + log_pfs.sum(-1)
+    log_pb_trajectory_given_sample = log_pbs.sum(-1)
+
+    log_weight = (log_pf_trajectory - log_pb_trajectory_given_sample).view(
+        batch_size, num_evals, -1
+    )
 
     return log_mean_exp(log_weight, dim=1).mean()
 
@@ -76,10 +102,10 @@ def evidence_upper_bound(model: SamplerModel, ground_truth_sample: torch.Tensor)
 
     log_reward_fn = model.energy_function.log_reward
 
-    _, log_pfs, log_pbs = model.get_backward_trajectory(ground_truth_sample)
-
+    trajectory, log_pfs, log_pbs = model.get_backward_trajectory(ground_truth_sample)
+    log_pf_0 = model.get_logprob_initial_state(trajectory[..., 0, :])
     log_reward = log_reward_fn(ground_truth_sample)
 
-    log_weight = log_reward + log_pbs.sum(-1) - log_pfs.sum(-1)
+    log_weight = get_log_weight(log_pfs, log_pbs, log_reward, log_pf_0)
 
     return log_weight.mean()
