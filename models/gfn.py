@@ -148,6 +148,10 @@ class GFN(SamplerModel):
         """
         assert state.dim() == 2 and state.size(1) == self.sample_dim
 
+        if math.isclose(time, self.dt):
+            # p_B(s_0|s_dt) is deterministic.
+            return {"deterministic": True}
+
         batch_size = state.shape[0]
         prev_time = time - self.dt
 
@@ -221,6 +225,12 @@ class GFN(SamplerModel):
         and follows little different distribution from p_B(-| s_t).
         """
         pb_params = self.get_backward_params(state, time)
+
+        if pb_params.get("deterministic") and math.isclose(time, self.dt):
+            # p_B(s_0|s_dt) is deterministic.
+            prev_state = torch.zeros_like(state, device=self.device)
+            return prev_state, pb_params
+
         pb_mean, pb_var = pb_params["mean"], pb_params["var"]
 
         # For backward transition, we don't add exploration noise.
@@ -248,6 +258,9 @@ class GFN(SamplerModel):
         cur: torch.Tensor,
         params: dict,
     ) -> torch.Tensor:
+        if params.get("deterministic"):
+            return torch.zeros(prev.shape[:-1], device=self.device)
+
         pb_mean, pb_var = params["mean"], params["var"]
         return gaussian_log_prob(prev, pb_mean, pb_var.log())
 

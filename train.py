@@ -57,18 +57,20 @@ def main(cfg: DictConfig) -> None:
     # Convert it to python dictionary.
     cfg_dict = OmegaConf.to_container(cfg)
 
-    wandb.init(
-        project=cfg.wandb.project,
-        entity="dywoo1247",
-        config=cfg_dict,
-        name=experiment_name,
-        tags=cfg.wandb.get("tags"),
-        group=cfg.wandb.get("group"),
-    )
+    if cfg.get("wandb"):
+        wandb.init(
+            project=cfg.wandb.project,
+            entity="dywoo1247",
+            config=cfg_dict,
+            name=experiment_name,
+            tags=cfg.wandb.get("tags"),
+            group=cfg.wandb.get("group"),
+        )
 
     train(cfg, model, energy_function)
 
-    wandb.finish()
+    if cfg.get("wandb"):
+        wandb.finish()
 
 
 def set_seed(seed):

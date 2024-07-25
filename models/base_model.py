@@ -154,12 +154,11 @@ class SamplerModel(torch.nn.Module, metaclass=abc.ABCMeta):
                 next_state, cur_state, pf_params
             )
 
-            # When cur_idx == 0, p_B(dt -> 0) is deterministic. We don't have to calculate.
-            if cur_idx > 0:
-                pb_params = self.get_backward_params(next_state, next_time)
-                logpb[:, cur_idx] = self.get_backward_logprob(
-                    cur_state, next_state, pb_params
-                )
+            pb_params = self.get_backward_params(next_state, next_time)
+
+            logpb[:, cur_idx] = self.get_backward_logprob(
+                cur_state, next_state, pb_params
+            )
 
             # This step is essential for back prop to work properly.
             # Reading cur_state from trajectory tensor will cause error.
@@ -193,19 +192,11 @@ class SamplerModel(torch.nn.Module, metaclass=abc.ABCMeta):
         trajectories[:, -1] = cur_state = final_states
 
         for cur_time, prev_time, cur_idx, prev_idx in self._backward_iter():
-            # When cur_idx == 1, p_B(s_0|s_dt) is deterministic.
-            if cur_idx == 1:
-                prev_state = torch.zeros(
-                    (batch_size, self.sample_dim), device=self.device
-                )
-            else:
-                prev_state, pb_params = self.get_prev_state(
-                    cur_state, cur_time, **kwargs
-                )
+            prev_state, pb_params = self.get_prev_state(cur_state, cur_time, **kwargs)
 
-                logpb[:, prev_idx] = self.get_backward_logprob(
-                    prev_state, cur_state, pb_params
-                )
+            logpb[:, prev_idx] = self.get_backward_logprob(
+                prev_state, cur_state, pb_params
+            )
 
             trajectories[:, prev_idx] = prev_state
 

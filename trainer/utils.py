@@ -69,8 +69,14 @@ def set_name_from_config(cfg: DictConfig):
 
     name = f"results/{cfg.energy._target_.split('.')[-1]}/"
     name += f"{ways}/{model_name}gfn/"
-    name += f"T_{cfg.model.trajectory_length}/tscale_{cfg.model.t_scale}/"
-    name += f"lvr_{cfg.model.log_var_range}/seed_{cfg.seed}/"
+    name += f"T_{cfg.model.trajectory_length}/"
+
+    if cfg.model.get("t_scale"):
+        name += f"tscale_{cfg.model.t_scale}/"
+    if cfg.model.get("log_var_range"):
+        name += f"lvr_{cfg.model.log_var_range}"
+
+    name += f"/seed_{cfg.seed}/"
 
     global NAME
     NAME = name

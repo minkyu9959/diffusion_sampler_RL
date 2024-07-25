@@ -1,0 +1,29 @@
+_target_: models.CMCD.CMCDSampler
+
+defaults:
+  - components@state_encoder: StateEncoding-PIS
+
+  - components@time_encoder: TimeEncoding-PIS
+
+  - components@control_model: JointPolicy-PIS
+
+  - /energy@prior_energy: Gaussian
+
+prior_energy: 
+  dim: ${energy.dim}
+  device: ${device}
+  logvar: 1.0
+
+control_model:
+  s_dim: ${energy.dim}
+
+state_encoder:
+  s_dim: ${energy.dim}
+
+trajectory_length: 100
+
+base_diffusion_rate: 1.0
+
+clipping: true
+lgv_clip: 1e2
+gfn_clip: 1e4

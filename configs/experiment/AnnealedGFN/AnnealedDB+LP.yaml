@@ -4,16 +4,8 @@ wandb:
   tags: ["AnnealedGFN"]
 
 defaults:
-  - override /model: GFN-PIS
+  - override /model: CMCD
   - override /train: AnnealedGFNTrainer
-
-model:
-  flow_model: null
-
-  langevin_scaler:
-    out_dim: 1
-
-  learned_variance: false
 
 train:
   train_mode: fwd

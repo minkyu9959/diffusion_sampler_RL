@@ -5,21 +5,51 @@ Train code for Annealed GFN.
 import torch
 import numpy as np
 
-from models import GFN
+from omegaconf import DictConfig
+
+from models import CMCDSampler
 from buffer import *
 
-from energy import AnnealedEnergy
-from trainer.gfn.GFNTrainer import GFNTrainer
+from energy import AnnealedDensities
+from trainer import BaseTrainer
 
+from .utils.gfn_utils import get_buffer, get_exploration_std
 from .utils.langevin import langevin_dynamics
 
 
-class AnnealedGFNTrainer(GFNTrainer):
-    def initialize(self):
-        super().initialize()
-        self.annealed_energy = AnnealedEnergy(
-            self.energy_function, "gaussian", log_var=np.log(9.0)
+def get_optimizer(optimizer_cfg: DictConfig, model: CMCDSampler):
+    param_groups = [
+        {"params": model.time_encoder.parameters()},
+        {"params": model.state_encoder.parameters()},
+        {"params": model.control_model.parameters()},
+    ]
+
+    param_groups += [{"params": model.logZ_ratio, "lr": optimizer_cfg.lr_flow}]
+
+    if optimizer_cfg.use_weight_decay:
+        gfn_optimizer = torch.optim.Adam(
+            param_groups,
+            optimizer_cfg.lr_policy,
+            weight_decay=optimizer_cfg.weight_decay,
         )
+    else:
+        gfn_optimizer = torch.optim.Adam(param_groups, optimizer_cfg.lr_policy)
+
+    return gfn_optimizer
+
+
+class AnnealedGFNTrainer(BaseTrainer):
+    def initialize(self):
+        train_cfg: DictConfig = self.train_cfg
+
+        self.gfn_optimizer = get_optimizer(train_cfg.optimizer, self.model)
+
+        self.buffer = get_buffer(train_cfg.buffer, self.energy_function)
+        self.local_search_buffer = get_buffer(train_cfg.buffer, self.energy_function)
+
+        self.annealed_energy: AnnealedDensities = self.model.annealed_energy
+
+        self.set_training_mode()
 
     def set_training_mode(self):
         """
@@ -43,8 +73,45 @@ class AnnealedGFNTrainer(GFNTrainer):
         else:
             raise Exception("Invalid training mode")
 
+    def train_step(self) -> float:
+        self.model.zero_grad()
+        train_cfg: DictConfig = self.train_cfg
+
+        exploration_std = get_exploration_std(
+            epoch=self.current_epoch,
+            exploratory=train_cfg.exploratory,
+            exploration_factor=train_cfg.exploration_factor,
+            exploration_wd=train_cfg.exploration_wd,
+        )
+
+        loss = self._train_step(exploration_std)
+
+        loss.backward()
+        self.gfn_optimizer.step()
+        return loss.item()
+
+    def train_from_both_ways(self, exploration_std):
+        # For even epoch, train with forward trajectory
+        if self.current_epoch % 2 == 0:
+            if self.train_cfg.sampling == "buffer":
+                loss, states, _, _, log_r = self.train_from_forward_trajectory(
+                    exploration_std,
+                    return_exp=True,
+                )
+                self.buffer.add(states[:, -1], log_r)
+            else:
+                loss = self.train_from_forward_trajectory(
+                    exploration_std,
+                )
+
+        # For odd epoch, train with backward trajectory
+        else:
+            loss = self.train_from_backward_trajectory(exploration_std)
+
+        return loss
+
     def train_from_forward_trajectory(self, exploration_std, return_exp=False):
-        gfn: GFN = self.model
+        gfn: CMCDSampler = self.model
 
         init_state = gfn.generate_initial_state(self.train_cfg.batch_size)
 
@@ -68,7 +135,7 @@ class AnnealedGFNTrainer(GFNTrainer):
     def train_from_backward_trajectory(self, exploration_std):
         train_cfg = self.train_cfg
         energy = self.energy_function
-        gfn_model: GFN = self.model
+        gfn_model: CMCDSampler = self.model
         buffer = self.buffer
         local_search_buffer = self.local_search_buffer
         epoch = self.current_epoch
@@ -95,9 +162,7 @@ class AnnealedGFNTrainer(GFNTrainer):
             else:
                 samples, rewards = buffer.sample()
 
-        trajectory, log_pfs, log_pbs = gfn_model.get_backward_trajectory(
-            samples, exploration_std=exploration_std
-        )
+        trajectory, log_pfs, log_pbs = gfn_model.get_backward_trajectory(samples)
 
         logZ_ratio = gfn_model.logZ_ratio
 

@@ -1,6 +1,6 @@
 from .gfn import GFN
 from .old_gfn import GFN as OldGFN
-from .CMCD import CMCD
+from .CMCD import CMCDSampler
 from .base_model import SamplerModel
 
 

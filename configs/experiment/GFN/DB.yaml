@@ -1,15 +1,21 @@
 # @package _global_
 
+wandb:
+  tags: ["GFN-PIS", "DB", "On-policy"]
+
 defaults:
-  - override /energy: 9gmm
+  - override /model: GFN-PIS
+
+model:
+  backward_model: null
+  langevin_scaler: null
 
 train:
-  both_ways: false
-  bwd: false
-  # Train from only forward trajectory.
+  train_mode: fwd
+  fwd_loss: db
 
   exploratory: false
-  sampling: "energy"
-  mode_bwd: tb
+
+  buffer: null
 
   local_search: null

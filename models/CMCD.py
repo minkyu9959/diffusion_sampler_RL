@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 from typing import Optional, Callable
 
-from energy import BaseEnergy, AnnealedEnergy
+from energy import BaseEnergy, AnnealedDensities
 
 from .base_model import SamplerModel
 
@@ -25,36 +25,36 @@ def gaussian_log_prob(x, mean, logvar):
     return (-0.5 * (log_two_pi + logvar + noise**2)).sum(1)
 
 
-class CMCD(SamplerModel):
+class CMCDSampler(SamplerModel):
     def __init__(
         self,
         energy_function: BaseEnergy,
+        prior_energy: BaseEnergy,
         trajectory_length: int,
         state_encoder: nn.Module,
         time_encoder: nn.Module,
         control_model: nn.Module,
-        prior_energy_type: Optional[str] = None,
-        log_var_range: float = 4.0,
         base_diffusion_rate: float = 1.0,
         clipping: bool = False,
         lgv_clip: float = 1e2,
         gfn_clip: float = 1e4,
         device=torch.device("cuda"),
     ):
-        super(CMCD, self).__init__(
+        super(CMCDSampler, self).__init__(
             energy_function=energy_function,
             trajectory_length=trajectory_length,
             device=device,
         )
 
-        self.annealed_energy = AnnealedEnergy(
-            energy_function=energy_function, prior=prior_energy_type
+        self.prior_energy = prior_energy
+
+        self.annealed_energy = AnnealedDensities(
+            energy_function=energy_function, prior_energy=prior_energy
         )
 
         self.state_encoder = state_encoder
         self.time_encoder = time_encoder
 
-        # These two model predict the mean and variance of Gaussian density.
         self.control_model = control_model
 
         # log Z ratio estimator (This one only used in annealed-GFN)
@@ -69,10 +69,7 @@ class CMCD(SamplerModel):
 
         self.learned_variance = False
 
-        # -log_var_range < (learned log var) < log_var_range
-        self.log_var_range = log_var_range
-
-        # base diffusion rate, sigma
+        # base diffusion rate, fixed sigma
         self.base_diffusion_rate = base_diffusion_rate
 
     def split_params(self, tensor):
@@ -233,7 +230,7 @@ class CMCD(SamplerModel):
         )
 
     def generate_initial_state(self, batch_size: int) -> torch.Tensor:
-        return torch.zeros(batch_size, self.sample_dim, device=self.device)
+        return self.prior_energy.sample(batch_size, device=self.device)
 
     def add_more_exploration(self, log_var: torch.Tensor, exploration_std: float):
         if exploration_std <= 0.0:

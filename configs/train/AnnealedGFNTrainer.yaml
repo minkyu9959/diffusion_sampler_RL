@@ -9,6 +9,7 @@ fwd_loss: annealed_db
 bwd_loss: annealed_db
 
 sampling: "buffer"
+
 exploratory: true
 exploration_factor: 0.2
 exploration_wd: true
