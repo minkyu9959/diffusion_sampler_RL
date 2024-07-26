@@ -20,6 +20,8 @@ from .utils.langevin import langevin_dynamics
 
 
 class GFNTrainer(BaseTrainer):
+    """Abstract class for GFN trainers."""
+
     def set_optimizer(self):
         assert type(self.model) is GFN
 
@@ -86,7 +88,6 @@ class GFNOffPolicyTrainer(GFNTrainer):
         exploration_std = self.get_exploration_schedulde()
 
         train_cfg = self.train_cfg
-        energy = self.energy_function
 
         # For even epoch, train with forward trajectory
         if self.current_epoch % 2 == 0:
