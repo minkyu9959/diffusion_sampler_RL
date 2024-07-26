@@ -19,7 +19,7 @@ from trainer.utils import save_model, get_experiment_name, fig_to_image
 class BaseTrainer(abc.ABC):
     """
     Base Trainer class for training models.
-    Use need to implement the following methods:
+    User need to implement the following methods:
         - initialize
         - train_step
 
@@ -71,7 +71,7 @@ class BaseTrainer(abc.ABC):
             else self.eval_cfg.eval_data_size
         )
 
-        metrics = compute_all_metrics(
+        metrics: dict = compute_all_metrics(
             model=self.model,
             eval_data_size=eval_data_size,
             do_resample=self.train_end,
