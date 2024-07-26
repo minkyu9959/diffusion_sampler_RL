@@ -5,6 +5,7 @@ wandb:
 
 defaults:
   - override /model: GFN-PIS
+  - override /train: GFN+OnPolicy
 
 model:
   t_scale: 1.0
@@ -13,13 +14,12 @@ model:
   flow_model: null
 
   # LP per dimension vs. Scalar LP
-  # langevin_scaler:
-  #   out_dim: 1
+  langevin_scaler:
+    out_dim: 1
 
 train:
   epochs: 10000
-  train_mode: fwd
+
   fwd_loss: pis
 
   exploratory: false
-  local_search: null

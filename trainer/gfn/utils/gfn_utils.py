@@ -9,7 +9,7 @@ from models import GFN
 from buffer import *
 from energy import BaseEnergy
 
-from .gfn_losses import *
+from .gfn_loss import *
 from omegaconf import DictConfig
 
 
@@ -29,49 +29,6 @@ def calculate_subtb_coeff_matrix(lamda, N):
     log_total_lambda = torch.logsumexp(B.view(-1), dim=0)
     coef = torch.exp(B - log_total_lambda)
     return coef
-
-
-def get_GFN_optimizer(
-    optimizer_cfg: DictConfig,
-    gfn_model: GFN,
-):
-    param_groups = [
-        {"params": gfn_model.time_encoder.parameters()},
-        {"params": gfn_model.state_encoder.parameters()},
-        {"params": gfn_model.forward_model.parameters()},
-    ]
-
-    if gfn_model.backward_model is not None:
-        param_groups += [
-            {
-                "params": gfn_model.backward_model.parameters(),
-                "lr": optimizer_cfg.lr_back,
-            }
-        ]
-
-    if gfn_model.langevin_scaler is not None:
-        param_groups += [{"params": gfn_model.langevin_scaler.parameters()}]
-
-    if gfn_model.flow_model is not None:
-        param_groups += [
-            {"params": gfn_model.flow_model.parameters(), "lr": optimizer_cfg.lr_flow}
-        ]
-    else:
-        # Even though there is no (conditional) flow model, GFN still learn logZ.
-        param_groups += [{"params": gfn_model.logZ, "lr": optimizer_cfg.lr_flow}]
-
-    param_groups += [{"params": gfn_model.logZ_ratio, "lr": optimizer_cfg.lr_flow}]
-
-    if optimizer_cfg.use_weight_decay:
-        gfn_optimizer = torch.optim.Adam(
-            param_groups,
-            optimizer_cfg.lr_policy,
-            weight_decay=optimizer_cfg.weight_decay,
-        )
-    else:
-        gfn_optimizer = torch.optim.Adam(param_groups, optimizer_cfg.lr_policy)
-
-    return gfn_optimizer
 
 
 def get_buffer(
@@ -106,17 +63,13 @@ def get_gfn_forward_loss(
     loss_fn(initial_state, gfn, log_reward_fn, exploration_std=None, return_exp=False)
     """
     if loss_type == "tb":
-        return fwd_tb
+        return GFNForwardLossWrapper(trajectory_balance_loss)
 
     elif loss_type == "tb-avg":
-        return fwd_tb_avg
+        return GFNForwardLossWrapper(vargrad_loss)
 
     elif loss_type == "db":
-        return db
-
-    elif loss_type == "subtb":
-        subtb_loss_fn = partial(coeff_matrix=coeff_matrix)
-        return subtb_loss_fn
+        return GFNForwardLossWrapper(detailed_balance_loss)
 
     elif loss_type == "pis":
         return pis
@@ -127,16 +80,59 @@ def get_gfn_forward_loss(
 
 def get_gfn_backward_loss(loss_type: str) -> Callable:
     if loss_type == "tb":
-        return bwd_tb
+        return GFNBackwardLossWrapper(trajectory_balance_loss)
 
     elif loss_type == "tb-avg":
-        return bwd_tb_avg
+        return GFNBackwardLossWrapper(vargrad_loss)
 
     elif loss_type == "mle":
-        return bwd_mle
+        return GFNBackwardLossWrapper(mle_loss)
 
     else:
         raise Exception("Invalid backward loss type")
+
+
+# def get_gfn_forward_loss(
+#     loss_type: str,
+#     coeff_matrix: Optional[torch.Tensor] = None,
+# ):
+#     """
+#     Get forward loss function based on the loss type.
+#     Returned loss functions have common interface.
+#     loss_fn(initial_state, gfn, log_reward_fn, exploration_std=None, return_exp=False)
+#     """
+#     if loss_type == "tb":
+#         return fwd_tb
+
+#     elif loss_type == "tb-avg":
+#         return fwd_tb_avg
+
+#     elif loss_type == "db":
+#         return db
+
+#     elif loss_type == "subtb":
+#         subtb_loss_fn = partial(coeff_matrix=coeff_matrix)
+#         return subtb_loss_fn
+
+#     elif loss_type == "pis":
+#         return pis
+
+#     else:
+#         return Exception("Invalid forward loss type")
+
+
+# def get_gfn_backward_loss(loss_type: str) -> Callable:
+#     if loss_type == "tb":
+#         return bwd_tb
+
+#     elif loss_type == "tb-avg":
+#         return bwd_tb_avg
+
+#     elif loss_type == "mle":
+#         return bwd_mle
+
+#     else:
+#         raise Exception("Invalid backward loss type")
 
 
 def get_exploration_std(

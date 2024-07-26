@@ -9,5 +9,3 @@ hidden_dim: 64
 out_dim: 1
 
 num_layers: 2
-
-zero_init: true

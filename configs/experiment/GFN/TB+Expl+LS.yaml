@@ -1,10 +1,11 @@
 # @package _global_
 
 wandb:
-  tags: ["GFN-PIS", "TB", "Exploratory", "LS"]
+  tags: ["TB", "Exploratory", "LS"]
 
 defaults:
   - override /model: GFN-PIS
+  - override /train: GFN+OffPolicy
 
 model:
   backward_model: null
@@ -12,8 +13,8 @@ model:
   flow_model: null
 
 train:
-  train_mode: both_ways
   fwd_loss: tb
+  bwd_loss: tb
 
   exploratory: true
   exploration_wd: true

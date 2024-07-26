@@ -1,16 +1,14 @@
 trainer:
-  _target_: trainer.gfn.GFNTrainer.GFNTrainer
+  _target_: trainer.gfn.GFNTrainer.GFNOffPolicyTrainer
 
 epochs: 25000
 batch_size: 300
 
 subtb_lambda: 2
 
-train_mode: both_ways
 fwd_loss: tb
 bwd_loss: tb
 
-sampling: "buffer"
 exploratory: true
 exploration_factor: 0.2
 exploration_wd: true

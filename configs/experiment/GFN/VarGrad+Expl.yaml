@@ -1,10 +1,11 @@
 # @package _global_
 
 wandb:
-  tags: ["GFN-PIS", "VarGrad", "Exploratory"]
+  tags: ["VarGrad", "Expl"]
 
 defaults:
   - override /model: GFN-PIS
+  - override /train: GFN+OnPolicy
 
 model:
   t_scale: 1.0
@@ -14,7 +15,6 @@ model:
   flow_model: null
 
 train:
-  train_mode: fwd
   fwd_loss: tb-avg
 
   exploratory: true

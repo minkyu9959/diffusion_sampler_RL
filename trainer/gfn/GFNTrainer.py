@@ -3,161 +3,154 @@ Train code for GFN with local search buffer + Langevin parametrization
 (Sendera et al., 2024, Improved off-policy training of diffusion samplers)
 """
 
-import torch
-
-from omegaconf import DictConfig
-
-from energy import BaseEnergy
 from buffer import *
 
 from trainer import BaseTrainer
 
+from models import GFN, get_GFN_optimizer
+
 from .utils.gfn_utils import (
     calculate_subtb_coeff_matrix,
-    get_GFN_optimizer,
     get_buffer,
     get_gfn_forward_loss,
     get_gfn_backward_loss,
     get_exploration_std,
 )
 from .utils.langevin import langevin_dynamics
-from .utils.gfn_losses import *
 
 
 class GFNTrainer(BaseTrainer):
-    def initialize(self):
-        train_cfg: DictConfig = self.train_cfg
+    def set_optimizer(self):
+        assert type(self.model) is GFN
 
-        self.gfn_optimizer = get_GFN_optimizer(train_cfg.optimizer, self.model)
+        self.optimizer = get_GFN_optimizer(self.train_cfg.optimizer, self.model)
 
+    def set_buffer(self):
+        train_cfg = self.train_cfg
         self.buffer = get_buffer(train_cfg.buffer, self.energy_function)
         self.local_search_buffer = get_buffer(train_cfg.buffer, self.energy_function)
 
-        self.set_training_mode()
-
-    def set_training_mode(self):
-        """
-        Depending on the training mode, set the training step function and loss function.
-        """
+    def get_exploration_schedulde(self):
         train_cfg = self.train_cfg
 
-        coeff_matrix = calculate_subtb_coeff_matrix(
-            train_cfg.subtb_lambda, self.model.trajectory_length
-        ).to(train_cfg.device)
-
-        train_mode = train_cfg.train_mode
-        if train_mode == "both_ways":
-            self._train_step = self.train_from_both_ways
-            self.fwd_loss = get_gfn_forward_loss(train_cfg.fwd_loss, coeff_matrix)
-            self.bwd_loss = get_gfn_backward_loss(train_cfg.bwd_loss)
-
-        elif train_mode == "fwd":
-            self._train_step = self.train_from_forward_trajectory
-            self.fwd_loss = get_gfn_forward_loss(train_cfg.fwd_loss, coeff_matrix)
-
-        elif train_mode == "bwd":
-            self._train_step = self.train_from_backward_trajectory
-            self.bwd_loss = get_gfn_backward_loss(train_cfg.bwd_loss)
-
-        else:
-            raise Exception("Invalid training mode")
-
-    def train_step(self) -> float:
-        self.model.zero_grad()
-
-        train_cfg: DictConfig = self.train_cfg
-
-        exploration_std = get_exploration_std(
+        return get_exploration_std(
             epoch=self.current_epoch,
             exploratory=train_cfg.exploratory,
             exploration_factor=train_cfg.exploration_factor,
             exploration_wd=train_cfg.exploration_wd,
         )
 
-        loss = self._train_step(exploration_std)
+
+class GFNOnPolicyTrainer(GFNTrainer):
+    def initialize(self):
+        self.set_optimizer()
+
+        train_cfg = self.train_cfg
+
+        coeff_matrix = calculate_subtb_coeff_matrix(
+            train_cfg.subtb_lambda, self.model.trajectory_length
+        ).to(train_cfg.device)
+
+        self.loss_fn = get_gfn_forward_loss(train_cfg.fwd_loss, coeff_matrix)
+
+    def train_step(self) -> float:
+        self.model.zero_grad()
+
+        loss = self.loss_fn.get_loss(
+            gfn=self.model,
+            batch_size=self.train_cfg.batch_size,
+            exploration_schedule=self.get_exploration_schedulde(),
+        )
 
         loss.backward()
-        self.gfn_optimizer.step()
+        self.optimizer.step()
         return loss.item()
 
-    def train_from_both_ways(self, exploration_std):
-        # For even epoch, train with forward trajectory
-        if self.current_epoch % 2 == 0:
-            if self.train_cfg.sampling == "buffer":
-                loss, states, _, _, log_r = self.train_from_forward_trajectory(
-                    exploration_std,
-                    return_exp=True,
-                )
-                self.buffer.add(states[:, -1], log_r)
-            else:
-                loss = self.train_from_forward_trajectory(
-                    exploration_std,
-                )
 
-        # For odd epoch, train with backward trajectory
-        else:
-            loss = self.train_from_backward_trajectory(exploration_std)
+class GFNOffPolicyTrainer(GFNTrainer):
+    def initialize(self):
+        self.set_optimizer()
+        self.set_buffer()
 
-        return loss
+        train_cfg = self.train_cfg
 
-    def train_from_forward_trajectory(
-        self,
-        exploration_std,
-        return_exp=False,
-    ):
+        coeff_matrix = calculate_subtb_coeff_matrix(
+            train_cfg.subtb_lambda, self.model.trajectory_length
+        ).to(train_cfg.device)
+
+        self.fwd_loss_fn = get_gfn_forward_loss(train_cfg.fwd_loss, coeff_matrix)
+        self.bwd_loss_fn = get_gfn_backward_loss(train_cfg.bwd_loss)
+
+    def train_step(self) -> float:
+        self.model.zero_grad()
+        exploration_std = self.get_exploration_schedulde()
+
         train_cfg = self.train_cfg
         energy = self.energy_function
 
-        init_state = torch.zeros(
-            train_cfg.batch_size, energy.data_ndim, device=train_cfg.device
-        )
+        # For even epoch, train with forward trajectory
+        if self.current_epoch % 2 == 0:
+            loss, states, _, _, log_r = self.fwd_loss_fn.get_loss(
+                self.model,
+                batch_size=train_cfg.batch_size,
+                exploration_schedule=exploration_std,
+                return_experience=True,
+            )
 
-        return self.fwd_loss(
-            initial_state=init_state,
-            gfn=self.model,
-            log_reward_fn=energy.log_reward,
-            exploration_std=exploration_std,
-            return_exp=return_exp,
-        )
+            self.buffer.add(states[:, -1], log_r)
 
-    def train_from_backward_trajectory(
-        self,
-        exploration_std=None,
-    ):
+        # For odd epoch, train with backward trajectory
+        else:
+            samples = self.sample_from_buffer()
+            loss = self.bwd_loss_fn.get_loss(
+                self.model,
+                samples,
+            )
+
+        loss.backward()
+        self.optimizer.step()
+
+        return loss.item()
+
+    def sample_from_buffer(self):
+        train_cfg = self.train_cfg
+        epoch = self.current_epoch
+        energy = self.energy_function
+
+        if train_cfg.get("local_search"):
+            if epoch % train_cfg.local_search.ls_cycle < 2:
+                samples, rewards = self.buffer.sample()
+                local_search_samples, log_r = langevin_dynamics(
+                    samples,
+                    energy.log_reward,
+                    train_cfg.device,
+                    train_cfg.local_search,
+                )
+                self.local_search_buffer.add(local_search_samples, log_r)
+
+            samples, rewards = self.local_search_buffer.sample()
+        else:
+            samples, rewards = self.buffer.sample()
+
+        return samples
+
+
+class SampleBasedGFNTrainer(GFNTrainer):
+    def initialize(self):
+        self.set_optimizer()
+        self.loss_fn = get_gfn_backward_loss(self.train_cfg.bwd_loss)
+
+    def train_step(self) -> float:
+        self.model.zero_grad()
 
         train_cfg = self.train_cfg
-        energy: BaseEnergy = self.energy_function
-        gfn_model: GFN = self.model
+        energy = self.energy_function
 
-        buffer = self.buffer
-        local_search_buffer = self.local_search_buffer
+        samples = energy.sample(train_cfg.batch_size, device=train_cfg.device)
 
-        epoch = self.current_epoch
+        loss = self.loss_fn(samples, self.model, energy.log_reward)
 
-        if train_cfg.sampling == "sleep_phase":
-            samples = gfn_model.sleep_phase_sample(
-                train_cfg.batch_size, exploration_std
-            ).to(train_cfg.device)
-        elif train_cfg.sampling == "energy":
-            samples = energy.sample(train_cfg.batch_size, device=train_cfg.device)
-        elif train_cfg.sampling == "buffer":
-            if train_cfg.get("local_search"):
-                if epoch % train_cfg.local_search.ls_cycle < 2:
-                    samples, rewards = buffer.sample()
-                    local_search_samples, log_r = langevin_dynamics(
-                        samples,
-                        energy.log_reward,
-                        train_cfg.device,
-                        train_cfg.local_search,
-                    )
-                    local_search_buffer.add(local_search_samples, log_r)
+        loss.backward()
+        self.optimizer.step()
 
-                samples, rewards = local_search_buffer.sample()
-            else:
-                samples, rewards = buffer.sample()
-
-        loss = self.bwd_loss(
-            samples, gfn_model, energy.log_reward, exploration_std=exploration_std
-        )
-
-        return loss
+        return loss.item()

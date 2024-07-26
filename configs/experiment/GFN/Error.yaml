@@ -1,25 +1,26 @@
 # @package _global_
 
 wandb:
-  tags: ["TB", "Expl", "LP"]
+  tags: ["Debugging"]
 
 defaults:
   - override /model: GFN-PIS
-  - override /train: GFN+OnPolicy
+  - override /train: GFN+OffPolicy
 
 model:
+  t_scale: 1.0
+
   backward_model: null
+  langevin_scaler: null
   flow_model: null
 
-  # Langevin scaling is just scalar not vector per dimension.
-  langevin_scaler:
-    out_dim: 1
-
 train:
-  epochs: 10000
-
-  fwd_loss: tb
+  train_mode: both-ways
+  fwd_loss: tb-avg
+  bwd_loss: tb
 
   exploratory: true
   exploration_wd: true
   exploration_factor: 0.2
+
+  local_search: null

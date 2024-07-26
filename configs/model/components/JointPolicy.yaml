@@ -8,4 +8,4 @@ t_dim: 64
 
 hidden_dim: 64
 
-zero_init: false
+zero_init: true
