@@ -7,12 +7,7 @@ defaults:
 
   - components@control_model: JointPolicy-PIS
 
-  - /energy@prior_energy: Gaussian
-
-prior_energy: 
-  dim: ${energy.dim}
-  device: ${device}
-  logvar: 1.0
+  - prior_energy: Gaussian
 
 control_model:
   s_dim: ${energy.dim}

@@ -57,3 +57,23 @@ class UniformEnergy(BaseEnergy):
 
     def score(self, x: torch.Tensor):
         return torch.zeros_like(x)
+
+
+class DiracDeltaEnergy(BaseEnergy):
+    logZ_is_available = False
+    can_sample = True
+
+    def energy(self, x: torch.Tensor):
+        return torch.zeros(*x.shape[:-1], device=x.device)
+
+    def _generate_sample(self, batch_size: int) -> torch.Tensor:
+        return torch.zeros((batch_size, self.ndim), device=self.device)
+
+    def log_prob(self, x: torch.Tensor):
+        assert x.shape[-1] == self.ndim
+        assert (x == torch.zeros(self.ndim, device=self.device)).prod()
+
+        return torch.zeros(*x.shape[:-1], device=x.device)
+
+    def score(self, x: torch.Tensor):
+        raise NotImplementedError("DiracDeltaEnergy does not have a score function.")
