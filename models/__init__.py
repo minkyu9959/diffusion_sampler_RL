@@ -1,18 +1,17 @@
-from .gfn import GFN
-from .old_gfn import GFN as OldGFN
-from .CMCD import CMCDSampler
 from .base_model import SamplerModel
 
+from .GFN import GFN
+from .old_gfn import GFN as OldGFN
+from .CMCD import CMCDSampler
 
-from energy import BaseEnergy
-
-from hydra.utils import instantiate
-from hydra import compose, initialize
-
-from omegaconf import DictConfig
-
+from .optimizer import get_CMCD_optimizer, get_GFN_optimizer
 
 import torch
+
+from hydra.utils import instantiate
+from omegaconf import DictConfig
+
+from energy import BaseEnergy
 
 
 def get_model(cfg: DictConfig, energy_function: BaseEnergy) -> SamplerModel:
@@ -30,5 +29,7 @@ __all__ = [
     "SamplerModel",
     "GFN",
     "OldGFN",
-    "CMCD",
+    "CMCDSampler",
+    "get_CMCD_optimizer",
+    "get_GFN_optimizer",
 ]

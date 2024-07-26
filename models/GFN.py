@@ -119,7 +119,7 @@ class GFN(SamplerModel):
 
         # Langevin parametrization trick, scale mean of forward density.
         if self.langevin_parametrization:
-            grad_log_reward = -self.energy_function.score(state)
+            grad_log_reward = self.energy_function.score(state)
 
             grad_log_reward = torch.nan_to_num(grad_log_reward)
             if self.clipping:
@@ -127,7 +127,6 @@ class GFN(SamplerModel):
                     grad_log_reward, -self.lgv_clip, self.lgv_clip
                 )
 
-            # Ad-hoc implementation for now. Need to be refactored.
             if self.langevin_scaler_is_PIS:
                 scale = self.langevin_scaler(time)
             else:
@@ -263,6 +262,15 @@ class GFN(SamplerModel):
 
         pb_mean, pb_var = params["mean"], params["var"]
         return gaussian_log_prob(prev, pb_mean, pb_var.log())
+
+    def get_forward_trajectory(
+        self, init_state, exploration_schedule=None, stochastic_backprop=False
+    ):
+        return super().get_forward_trajectory(
+            init_state,
+            exploration_schedule=exploration_schedule,
+            stochastic_backprop=stochastic_backprop,
+        )
 
     def generate_initial_state(self, batch_size: int) -> torch.Tensor:
         return torch.zeros(batch_size, self.sample_dim, device=self.device)

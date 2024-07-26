@@ -9,10 +9,10 @@ NAME = None
 
 
 def check_config_and_set_read_only(cfg: DictConfig):
-    if cfg.train.train_mode not in ["fwd", "bwd", "both_ways", "sequential"]:
-        raise ValueError("Invalid trajectory source")
-
-    if cfg.train.get("local_search") and cfg.train.train_mode == "fwd":
+    if (
+        cfg.train.get("local_search")
+        and cfg.train.trainer._target_.split(".")[-1] != "GFNOffPolicyTrainer"
+    ):
         raise ValueError("Local search cannot be used with foward trajectory training.")
 
     # From now, config file cannot be modified.
@@ -46,13 +46,13 @@ def set_name_from_config(cfg: DictConfig):
         else:
             fwd_loss = cfg.train.fwd_loss
 
-    train_mode = cfg.train.train_mode
-    if train_mode == "both_ways":
-        ways = f"both_ways/fwd_{fwd_loss}_bwd_{cfg.train.bwd_loss}"
-    elif train_mode == "bwd":
-        ways = f"bwd/bwd_{cfg.train.bwd_loss}"
-    elif train_mode == "fwd":
-        ways = f"fwd/fwd_{fwd_loss}"
+    trainer = cfg.train.trainer._target_.split(".")[-1]
+    if trainer == "GFNOffPolicyTrainer":
+        ways = f"{trainer}/fwd_{fwd_loss}_bwd_{cfg.train.bwd_loss}"
+    elif trainer == "SampleBasedGFNTrainer":
+        ways = f"{trainer}/{cfg.train.bwd_loss}"
+    elif trainer == "GFNOnPolicyTrainer":
+        ways = f"{trainer}/{fwd_loss}"
 
     if cfg.train.get("local_search"):
         local_serach_cfg = cfg.train.local_search

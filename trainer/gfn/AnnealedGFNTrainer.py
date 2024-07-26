@@ -7,7 +7,7 @@ import numpy as np
 
 from omegaconf import DictConfig
 
-from models import CMCDSampler
+from models import CMCDSampler, get_CMCD_optimizer
 from buffer import *
 
 from energy import AnnealedDensities
@@ -17,32 +17,11 @@ from .utils.gfn_utils import get_buffer, get_exploration_std
 from .utils.langevin import langevin_dynamics
 
 
-def get_optimizer(optimizer_cfg: DictConfig, model: CMCDSampler):
-    param_groups = [
-        {"params": model.time_encoder.parameters()},
-        {"params": model.state_encoder.parameters()},
-        {"params": model.control_model.parameters()},
-    ]
-
-    param_groups += [{"params": model.logZ_ratio, "lr": optimizer_cfg.lr_flow}]
-
-    if optimizer_cfg.use_weight_decay:
-        gfn_optimizer = torch.optim.Adam(
-            param_groups,
-            optimizer_cfg.lr_policy,
-            weight_decay=optimizer_cfg.weight_decay,
-        )
-    else:
-        gfn_optimizer = torch.optim.Adam(param_groups, optimizer_cfg.lr_policy)
-
-    return gfn_optimizer
-
-
 class AnnealedGFNTrainer(BaseTrainer):
     def initialize(self):
         train_cfg: DictConfig = self.train_cfg
 
-        self.gfn_optimizer = get_optimizer(train_cfg.optimizer, self.model)
+        self.gfn_optimizer = get_CMCD_optimizer(train_cfg.optimizer, self.model)
 
         self.buffer = get_buffer(train_cfg.buffer, self.energy_function)
         self.local_search_buffer = get_buffer(train_cfg.buffer, self.energy_function)
@@ -111,15 +90,15 @@ class AnnealedGFNTrainer(BaseTrainer):
         return loss
 
     def train_from_forward_trajectory(self, exploration_std, return_exp=False):
-        gfn: CMCDSampler = self.model
+        model: CMCDSampler = self.model
 
-        init_state = gfn.generate_initial_state(self.train_cfg.batch_size)
+        init_state = model.generate_initial_state(self.train_cfg.batch_size)
 
-        trajectory, log_pfs, log_pbs = gfn.get_forward_trajectory(
+        trajectory, log_pfs, log_pbs = model.get_forward_trajectory(
             init_state, exploration_schedule=exploration_std
         )
 
-        logZ_ratio = gfn.logZ_ratio
+        logZ_ratio = model.logZ_ratio
 
         if return_exp:
             loss, log_reward = self.annealed_db(
@@ -135,13 +114,13 @@ class AnnealedGFNTrainer(BaseTrainer):
     def train_from_backward_trajectory(self, exploration_std):
         train_cfg = self.train_cfg
         energy = self.energy_function
-        gfn_model: CMCDSampler = self.model
+        model: CMCDSampler = self.model
         buffer = self.buffer
         local_search_buffer = self.local_search_buffer
         epoch = self.current_epoch
 
         if train_cfg.sampling == "sleep_phase":
-            samples = gfn_model.sleep_phase_sample(
+            samples = model.sleep_phase_sample(
                 train_cfg.batch_size, exploration_std
             ).to(train_cfg.device)
         elif train_cfg.sampling == "energy":
@@ -162,9 +141,9 @@ class AnnealedGFNTrainer(BaseTrainer):
             else:
                 samples, rewards = buffer.sample()
 
-        trajectory, log_pfs, log_pbs = gfn_model.get_backward_trajectory(samples)
+        trajectory, log_pfs, log_pbs = model.get_backward_trajectory(samples)
 
-        logZ_ratio = gfn_model.logZ_ratio
+        logZ_ratio = model.logZ_ratio
 
         loss = self.annealed_db(trajectory, logZ_ratio, log_pfs, log_pbs)
 

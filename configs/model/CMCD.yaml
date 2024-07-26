@@ -1,4 +1,4 @@
-_target_: models.CMCD.CMCDSampler
+_target_: models.CMCDSampler
 
 defaults:
   - components@state_encoder: StateEncoding-PIS

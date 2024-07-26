@@ -9,6 +9,7 @@ import wandb
 from omegaconf import DictConfig
 
 from energy import BaseEnergy, Plotter
+from models import SamplerModel
 from buffer import *
 
 from metrics import compute_all_metrics, add_prefix_to_dict_key
@@ -27,7 +28,7 @@ class BaseTrainer(abc.ABC):
 
     def __init__(
         self,
-        model: torch.nn.Module,
+        model: SamplerModel,
         energy_function: BaseEnergy,
         train_cfg: DictConfig,
         eval_cfg: DictConfig,
