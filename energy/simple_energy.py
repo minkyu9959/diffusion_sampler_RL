@@ -21,6 +21,10 @@ class GaussianEnergy(BaseEnergy):
         self._ground_truth_logZ = 0.5 * (self.log_two_pi + self.logvar)
 
     @property
+    def var(self):
+        return np.exp(self.logvar)
+
+    @property
     def sigma(self):
         return np.exp(0.5 * self.logvar)
 
@@ -28,10 +32,10 @@ class GaussianEnergy(BaseEnergy):
         return torch.randn((batch_size, self.ndim), device=self.device) * self.sigma
 
     def energy(self, x: torch.Tensor):
-        return 0.5 * (x**2).sum(-1) / self.sigma
+        return 0.5 * (x**2).sum(-1) / self.var
 
     def score(self, x: torch.Tensor):
-        return -x / self.sigma
+        return -x / self.var
 
     def log_prob(self, x: torch.Tensor):
         return -self.energy(x) - self._ground_truth_logZ
