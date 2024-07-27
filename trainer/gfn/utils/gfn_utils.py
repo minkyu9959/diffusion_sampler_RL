@@ -1,15 +1,12 @@
-from typing import Callable, Optional
-from functools import partial
+from typing import Optional
 
 import torch
 
 import numpy as np
 
-from models import GFN
 from buffer import *
 from energy import BaseEnergy
 
-from .gfn_loss import *
 from omegaconf import DictConfig
 
 
@@ -51,88 +48,6 @@ def get_buffer(
         data_ndim=energy_function.data_ndim,
         beta=buffer_cfg.beta,
     )
-
-
-def get_gfn_forward_loss(
-    loss_type: str,
-    coeff_matrix: Optional[torch.Tensor] = None,
-):
-    """
-    Get forward loss function based on the loss type.
-    Returned loss functions have common interface.
-    loss_fn(initial_state, gfn, log_reward_fn, exploration_std=None, return_exp=False)
-    """
-    if loss_type == "tb":
-        return GFNForwardLossWrapper(trajectory_balance_loss)
-
-    elif loss_type == "tb-avg":
-        return GFNForwardLossWrapper(vargrad_loss)
-
-    elif loss_type == "db":
-        return GFNForwardLossWrapper(detailed_balance_loss)
-
-    elif loss_type == "pis":
-        return pis
-
-    else:
-        return Exception("Invalid forward loss type")
-
-
-def get_gfn_backward_loss(loss_type: str) -> Callable:
-    if loss_type == "tb":
-        return GFNBackwardLossWrapper(trajectory_balance_loss)
-
-    elif loss_type == "tb-avg":
-        return GFNBackwardLossWrapper(vargrad_loss)
-
-    elif loss_type == "mle":
-        return GFNBackwardLossWrapper(mle_loss)
-
-    else:
-        raise Exception("Invalid backward loss type")
-
-
-# def get_gfn_forward_loss(
-#     loss_type: str,
-#     coeff_matrix: Optional[torch.Tensor] = None,
-# ):
-#     """
-#     Get forward loss function based on the loss type.
-#     Returned loss functions have common interface.
-#     loss_fn(initial_state, gfn, log_reward_fn, exploration_std=None, return_exp=False)
-#     """
-#     if loss_type == "tb":
-#         return fwd_tb
-
-#     elif loss_type == "tb-avg":
-#         return fwd_tb_avg
-
-#     elif loss_type == "db":
-#         return db
-
-#     elif loss_type == "subtb":
-#         subtb_loss_fn = partial(coeff_matrix=coeff_matrix)
-#         return subtb_loss_fn
-
-#     elif loss_type == "pis":
-#         return pis
-
-#     else:
-#         return Exception("Invalid forward loss type")
-
-
-# def get_gfn_backward_loss(loss_type: str) -> Callable:
-#     if loss_type == "tb":
-#         return bwd_tb
-
-#     elif loss_type == "tb-avg":
-#         return bwd_tb_avg
-
-#     elif loss_type == "mle":
-#         return bwd_mle
-
-#     else:
-#         raise Exception("Invalid backward loss type")
 
 
 def get_exploration_std(

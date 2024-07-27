@@ -9,11 +9,10 @@ from trainer import BaseTrainer
 
 from models import GFN, get_GFN_optimizer
 
+from models.loss import get_gfn_forward_loss, get_gfn_backward_loss
+
 from .utils.gfn_utils import (
-    calculate_subtb_coeff_matrix,
     get_buffer,
-    get_gfn_forward_loss,
-    get_gfn_backward_loss,
     get_exploration_std,
 )
 from .utils.langevin import langevin_dynamics
@@ -49,16 +48,12 @@ class GFNOnPolicyTrainer(GFNTrainer):
 
         train_cfg = self.train_cfg
 
-        coeff_matrix = calculate_subtb_coeff_matrix(
-            train_cfg.subtb_lambda, self.model.trajectory_length
-        ).to(train_cfg.device)
-
-        self.loss_fn = get_gfn_forward_loss(train_cfg.fwd_loss, coeff_matrix)
+        self.loss_fn = get_gfn_forward_loss(train_cfg.fwd_loss)
 
     def train_step(self) -> float:
         self.model.zero_grad()
 
-        loss = self.loss_fn.get_loss(
+        loss = self.loss_fn(
             gfn=self.model,
             batch_size=self.train_cfg.batch_size,
             exploration_schedule=self.get_exploration_schedulde(),
@@ -76,11 +71,7 @@ class GFNOffPolicyTrainer(GFNTrainer):
 
         train_cfg = self.train_cfg
 
-        coeff_matrix = calculate_subtb_coeff_matrix(
-            train_cfg.subtb_lambda, self.model.trajectory_length
-        ).to(train_cfg.device)
-
-        self.fwd_loss_fn = get_gfn_forward_loss(train_cfg.fwd_loss, coeff_matrix)
+        self.fwd_loss_fn = get_gfn_forward_loss(train_cfg.fwd_loss)
         self.bwd_loss_fn = get_gfn_backward_loss(train_cfg.bwd_loss)
 
     def train_step(self) -> float:
@@ -91,7 +82,7 @@ class GFNOffPolicyTrainer(GFNTrainer):
 
         # For even epoch, train with forward trajectory
         if self.current_epoch % 2 == 0:
-            loss, states, _, _, log_r = self.fwd_loss_fn.get_loss(
+            loss, states, _, _, log_r = self.fwd_loss_fn(
                 self.model,
                 batch_size=train_cfg.batch_size,
                 exploration_schedule=exploration_std,
@@ -103,7 +94,7 @@ class GFNOffPolicyTrainer(GFNTrainer):
         # For odd epoch, train with backward trajectory
         else:
             samples = self.sample_from_buffer()
-            loss = self.bwd_loss_fn.get_loss(
+            loss = self.bwd_loss_fn(
                 self.model,
                 samples,
             )

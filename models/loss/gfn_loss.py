@@ -1,70 +1,56 @@
 import torch
+from torch import Tensor
 
-from models import GFN
+
+from models import GFNv2
 
 
 def trajectory_balance_loss(
-    log_pfs: torch.Tensor,
-    log_pbs: torch.Tensor,
-    log_Z: torch.Tensor,
-    log_reward: torch.Tensor,
+    log_prior: Tensor,
+    log_pfs: Tensor,
+    log_pbs: Tensor,
+    log_Z: Tensor,
+    log_reward: Tensor,
 ):
-    loss = 0.5 * ((log_pfs.sum(-1) + log_Z - log_pbs.sum(-1) - log_reward) ** 2)
+    loss = 0.5 * (
+        (log_prior + log_pfs.sum(-1) + log_Z - log_pbs.sum(-1) - log_reward) ** 2
+    )
     return loss.mean()
 
 
 def vargrad_loss(
-    log_pfs: torch.Tensor,
-    log_pbs: torch.Tensor,
-    log_reward: torch.Tensor,
+    log_prior: Tensor,
+    log_pfs: Tensor,
+    log_pbs: Tensor,
+    log_reward: Tensor,
 ):
+    # Estimate log Z with batch average.
     log_Z = (log_reward + log_pbs.sum(-1) - log_pfs.sum(-1)).mean(dim=0, keepdim=True)
-    loss = log_Z + (log_pfs.sum(-1) - log_reward - log_pbs.sum(-1))
+    loss = log_Z + (log_prior + log_pfs.sum(-1) - log_reward - log_pbs.sum(-1))
     return 0.5 * (loss**2).mean()
 
 
 def detailed_balance_loss(
-    log_pfs: torch.Tensor,
-    log_pbs: torch.Tensor,
-    log_fs: torch.Tensor,
-    log_reward: torch.Tensor,
+    log_prior: Tensor,
+    log_pfs: Tensor,
+    log_pbs: Tensor,
+    log_fs: Tensor,
+    log_Z: Tensor,
+    log_reward: Tensor,
 ):
     log_fs[:, -1] = log_reward
 
-    loss = 0.5 * ((log_pfs + log_fs[:, :-1] - log_pbs - log_fs[:, 1:]) ** 2).sum(-1)
+    loss = ((log_pfs + log_fs[:, :-1] - log_pbs - log_fs[:, 1:]) ** 2).sum(-1)
+    loss += (log_Z + log_prior - log_fs[:, 0]) ** 2
+
+    return (0.5 * loss).mean()
+
+
+def mle_loss(log_prior: Tensor, log_pfs: torch.Tensor):
+
+    loss = -(log_prior + log_pfs.sum(-1))
 
     return loss.mean()
-
-
-def mle_loss(log_pfs: torch.Tensor):
-
-    loss = -log_pfs.sum(-1)
-
-    return loss.mean()
-
-
-def pis(
-    gfn: GFN,
-    batch_size: int,
-    exploration_schedule=None,
-    return_experience: bool = False,
-):
-    init_state = gfn.generate_initial_state(batch_size)
-    traj, log_pfs, log_pbs = gfn.get_forward_trajectory(
-        init_state, exploration_schedule=exploration_schedule, stochastic_backprop=True
-    )
-
-    with torch.enable_grad():
-        log_reward = gfn.energy_function.log_reward(traj[:, -1])
-
-    normalization_constant = float(1 / init_state.shape[-1])
-
-    loss = normalization_constant * (log_pfs.sum(-1) - log_pbs.sum(-1) - log_reward)
-
-    if return_experience:
-        return loss.mean(), traj, log_pfs, log_pbs, log_reward
-    else:
-        return loss.mean()
 
 
 def analyze_loss_fn_argument(loss_fn):
@@ -77,7 +63,7 @@ def analyze_loss_fn_argument(loss_fn):
         need_log_reward = True
         need_log_flows = False
     elif loss_fn is detailed_balance_loss:
-        need_log_Z = False
+        need_log_Z = True
         need_log_reward = True
         need_log_flows = True
     elif loss_fn is mle_loss:
@@ -97,14 +83,16 @@ class GFNForwardLossWrapper:
             analyze_loss_fn_argument(loss_fn)
         )
 
-    def get_loss(
+    def __call__(
         self,
-        gfn: GFN,
+        gfn: GFNv2,
         batch_size: int,
         exploration_schedule=None,
         return_experience: bool = False,
     ):
         init_state = gfn.generate_initial_state(batch_size)
+        log_prior = gfn.get_logprob_initial_state(init_state)
+
         traj, log_pfs, log_pbs = gfn.get_forward_trajectory(
             init_state, exploration_schedule=exploration_schedule
         )
@@ -112,10 +100,11 @@ class GFNForwardLossWrapper:
         kwargs = {
             "log_pfs": log_pfs,
             "log_pbs": log_pbs,
+            "log_prior": log_prior,
         }
 
         if self.need_log_Z:
-            kwargs["log_Z"] = gfn.get_learned_logZ(traj)
+            kwargs["log_Z"] = gfn.learned_logZ
 
         if self.need_log_reward or return_experience:
             with torch.no_grad():
@@ -142,16 +131,18 @@ class GFNBackwardLossWrapper:
             analyze_loss_fn_argument(loss_fn)
         )
 
-    def get_loss(self, gfn: GFN, sample: torch.Tensor):
+    def __call__(self, gfn: GFNv2, sample: torch.Tensor):
         traj, log_pfs, log_pbs = gfn.get_backward_trajectory(sample)
+        log_prior = gfn.get_logprob_initial_state(traj[..., 0, :])
 
         kwargs = {
             "log_pfs": log_pfs,
             "log_pbs": log_pbs,
+            "log_prior": log_prior,
         }
 
         if self.need_log_Z:
-            kwargs["log_Z"] = gfn.get_learned_logZ(traj)
+            kwargs["log_Z"] = gfn.learned_logZ
 
         if self.need_log_reward:
             kwargs["log_reward"] = gfn.energy_function.log_reward(sample)
