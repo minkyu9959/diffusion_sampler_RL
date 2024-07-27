@@ -7,8 +7,6 @@ from buffer import *
 
 from trainer import BaseTrainer
 
-from models import GFN, get_GFN_optimizer
-
 from models.loss import get_gfn_forward_loss, get_gfn_backward_loss
 
 from .utils.gfn_utils import (
@@ -22,9 +20,7 @@ class GFNTrainer(BaseTrainer):
     """Abstract class for GFN trainers."""
 
     def set_optimizer(self):
-        assert type(self.model) is GFN
-
-        self.optimizer = get_GFN_optimizer(self.train_cfg.optimizer, self.model)
+        self.optimizer = self.model.get_optimizer(self.train_cfg.optimizer)
 
     def set_buffer(self):
         train_cfg = self.train_cfg

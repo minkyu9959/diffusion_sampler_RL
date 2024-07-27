@@ -13,6 +13,8 @@ defaults:
 
   - components@langevin_scaler: LangevinScaling-PIS
 
+  - prior_energy: Dirac
+
 forward_model:
   s_dim: ${energy.dim}
 

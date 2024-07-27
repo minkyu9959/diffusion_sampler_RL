@@ -4,11 +4,12 @@ wandb:
   tags: ["AnnealedGFN", "LP"]
 
 defaults:
-  - override /model: CMCD
-  - override /train: AnnealedGFNTrainer
+  - override /model: AnnealedGFN
+  - override /train: GFN+OnPolicy
 
 train:
   train_mode: fwd
+  fwd_loss: annealed_db
 
   exploratory: false
 

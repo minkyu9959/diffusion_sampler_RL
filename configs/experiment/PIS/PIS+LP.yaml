@@ -10,6 +10,8 @@ defaults:
 model:
   t_scale: 1.0
 
+  backprop_through_state: true
+
   backward_model: null
   flow_model: null
 

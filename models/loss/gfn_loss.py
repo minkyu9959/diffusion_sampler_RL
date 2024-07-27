@@ -2,7 +2,7 @@ import torch
 from torch import Tensor
 
 
-from models import GFNv2
+from models import GFN
 
 
 def trajectory_balance_loss(
@@ -15,6 +15,21 @@ def trajectory_balance_loss(
     loss = 0.5 * (
         (log_prior + log_pfs.sum(-1) + log_Z - log_pbs.sum(-1) - log_reward) ** 2
     )
+    return loss.mean()
+
+
+def annealed_db(
+    log_prior: torch.Tensor,
+    log_pfs: torch.Tensor,
+    log_pbs: torch.Tensor,
+    logZ_ratio: torch.Tensor,
+    log_reward_t: torch.Tensor,
+):
+    loss = 0.5 * (
+        (log_pfs + logZ_ratio + log_reward_t[:, :-1] - log_pbs - log_reward_t[:, 1:])
+        ** 2
+    ).sum(-1)
+
     return loss.mean()
 
 
@@ -70,6 +85,10 @@ def analyze_loss_fn_argument(loss_fn):
         need_log_Z = False
         need_log_reward = False
         need_log_flows = False
+    elif loss_fn is annealed_db:
+        need_log_Z = False
+        need_log_reward = False
+        need_log_flows = False
     else:
         raise Exception("Not supported loss type.")
 
@@ -83,9 +102,11 @@ class GFNForwardLossWrapper:
             analyze_loss_fn_argument(loss_fn)
         )
 
+        self.loss_is_annealed_db = loss_fn is annealed_db
+
     def __call__(
         self,
-        gfn: GFNv2,
+        gfn: GFN,
         batch_size: int,
         exploration_schedule=None,
         return_experience: bool = False,
@@ -116,6 +137,12 @@ class GFNForwardLossWrapper:
         if self.need_log_flows:
             kwargs["log_flows"] = gfn.get_flow_from_trajectory(traj)
 
+        if self.loss_is_annealed_db:
+            kwargs["logZ_ratio"] = gfn.logZ_ratio
+
+            times = torch.linspace(0, 1, traj.size(1), device=traj.device)
+            kwargs["log_reward_t"] = -gfn.annealed_energy.energy(times, traj)
+
         loss = self.loss_fn(**kwargs)
 
         if return_experience:
@@ -131,7 +158,9 @@ class GFNBackwardLossWrapper:
             analyze_loss_fn_argument(loss_fn)
         )
 
-    def __call__(self, gfn: GFNv2, sample: torch.Tensor):
+        self.loss_is_annealed_db = loss_fn is annealed_db
+
+    def __call__(self, gfn: GFN, sample: torch.Tensor):
         traj, log_pfs, log_pbs = gfn.get_backward_trajectory(sample)
         log_prior = gfn.get_logprob_initial_state(traj[..., 0, :])
 
@@ -149,5 +178,11 @@ class GFNBackwardLossWrapper:
 
         if self.need_log_flows:
             kwargs["log_flows"] = gfn.get_flow_from_trajectory(traj)
+
+        if self.loss_is_annealed_db:
+            kwargs["logZ_ratio"] = gfn.logZ_ratio
+
+            times = torch.linspace(0, 1, traj.size(1), device=traj.device)
+            kwargs["log_reward_t"] = -gfn.annealed_energy.energy(times, traj)
 
         return self.loss_fn(**kwargs)

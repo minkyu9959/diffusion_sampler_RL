@@ -9,9 +9,11 @@ def pis(
     exploration_schedule=None,
     return_experience: bool = False,
 ):
+    assert gfn.backprop_through_state is True
+
     init_state = gfn.generate_initial_state(batch_size)
     traj, log_pfs, log_pbs = gfn.get_forward_trajectory(
-        init_state, exploration_schedule=exploration_schedule, stochastic_backprop=True
+        init_state, exploration_schedule=exploration_schedule
     )
 
     with torch.enable_grad():

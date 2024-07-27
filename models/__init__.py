@@ -1,10 +1,11 @@
 from .base_model import SamplerModel
 
-from .GFN import GFN
+from .old_gfn_v1 import GFN as OldGFNv1
 from .old_gfn import GFN as OldGFN
-from .CMCD import CMCDSampler
 
-from .optimizer import get_CMCD_optimizer, get_GFN_optimizer
+from .cmcd import CMCDSampler
+from .gfn import GFN
+from .annealed_gfn import AnnealedGFN
 
 import torch
 
@@ -28,8 +29,6 @@ __all__ = [
     "get_model",
     "SamplerModel",
     "GFN",
-    "OldGFN",
+    "AnnealedGFN",
     "CMCDSampler",
-    "get_CMCD_optimizer",
-    "get_GFN_optimizer",
 ]

@@ -48,7 +48,7 @@ def log_partition_function(model: SamplerModel, sample_size: int = 1000):
 
     if type(model) == GFN:
         # If GFN model and flow is learned (i.e., log Z is learned directly),
-        log_Z = model.get_learned_logZ(trajectory)
+        log_Z = model.learned_logZ
         metrics["log_Z_learned"] = log_Z.mean()
 
     sample = trajectory[:, -1]

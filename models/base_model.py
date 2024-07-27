@@ -17,19 +17,21 @@ which use both forward, backward path measure.
                        prev_time         cur_time          next_time
 
     Note:
-
     - SamplerModel._forward_iter iteratively yields (cur, next) from start to end.
 
     - SamplerModel._backward_iter iteratively yields (prev, cur) from end to start.
 """
 
-import abc
+from typing import Optional, Callable
+
 import torch
+
+from .components.conditional_density import ConditionalDensity
 
 from energy import BaseEnergy
 
 
-class SamplerModel(torch.nn.Module, metaclass=abc.ABCMeta):
+class SamplerModel(torch.nn.Module):
     """
     Abstract base class for sequential sampler models
     which use both forward, backward path measure.
@@ -40,89 +42,49 @@ class SamplerModel(torch.nn.Module, metaclass=abc.ABCMeta):
     def __init__(
         self,
         energy_function: BaseEnergy,
+        prior_energy: BaseEnergy,
         trajectory_length: int = 100,
         device=torch.device("cuda"),
+        backprop_through_state: bool = False,
     ):
         super(SamplerModel, self).__init__()
 
+        self.prior_energy = prior_energy
         self.energy_function = energy_function
         self.sample_dim = energy_function.data_ndim
         self.trajectory_length = trajectory_length
 
         self.dt = 1.0 / trajectory_length
 
+        self.backprop_through_state = backprop_through_state
+
         self.device = device
 
-    @abc.abstractmethod
+    def set_conditional_density(
+        self,
+        forward_conditional: ConditionalDensity,
+        backward_conditional: ConditionalDensity,
+    ):
+        self.forward_conditional = forward_conditional
+        self.backward_conditional = backward_conditional
+
     def generate_initial_state(self, batch_size: int) -> torch.Tensor:
-        pass
+        """
+        Generate initial state using prior energy function.
+        """
+        return self.prior_energy.sample(batch_size, device=self.device)
 
-    @abc.abstractmethod
     def get_logprob_initial_state(self, init_state: torch.Tensor) -> torch.Tensor:
-        pass
-
-    @abc.abstractmethod
-    def get_forward_params(self, state: torch.Tensor, time: float, **kwargs):
         """
-        Get forward conditional density's parameters.
-        For given state s and time t, return the parameters of p_F(-| s_t).
+        Return the log probability of initial states.
         """
-        pass
-
-    @abc.abstractmethod
-    def get_backward_params(self, state: torch.Tensor, time: float, **kwargs):
-        """
-        Get backward conditional density's parameters.
-        For given state s and time t, return the parameters of p_B(-| s_t).
-        """
-        pass
-
-    @abc.abstractmethod
-    def get_next_state(self, state: torch.Tensor, time: float, **kwargs):
-        """
-        For given state s and time t,
-        sample next state s_{t+1} from p_F(-| s_t) and
-        return the parameters of p_F(-| s_t).
-
-        Note that sample can be generated via additional exploration,
-        and follows little different distribution from p_F(-| s_t).
-        """
-        pass
-
-    @abc.abstractmethod
-    def get_prev_state(self, state: torch.Tensor, time: float, **kwargs):
-        """
-        For given state s and time t,
-        sample next state s_{t-1} from p_B(-| s_t) and
-        return the parameters of p_B(-| s_t).
-
-        Note that sample can be generated via additional exploration,
-        and follows little different distribution from p_B(-| s_t).
-        """
-        pass
-
-    @abc.abstractmethod
-    def get_forward_logprob(
-        self,
-        next: torch.Tensor,
-        cur: torch.Tensor,
-        params: dict,
-        **kwargs,
-    ) -> torch.Tensor:
-        pass
-
-    @abc.abstractmethod
-    def get_backward_logprob(
-        self,
-        prev: torch.Tensor,
-        cur: torch.Tensor,
-        params: dict,
-        **kwargs,
-    ) -> torch.Tensor:
-        pass
+        # Prior energy must support the log_prob method.
+        return self.prior_energy.log_prob(init_state)
 
     def get_forward_trajectory(
-        self, initial_states: torch.Tensor, **kwargs
+        self,
+        initial_states: torch.Tensor,
+        exploration_schedule: Optional[Callable[[float], float]] = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Generate forward trajectory from given initial states.
@@ -150,19 +112,29 @@ class SamplerModel(torch.nn.Module, metaclass=abc.ABCMeta):
         trajectories[:, 0] = cur_state = initial_states
 
         for cur_time, next_time, cur_idx, next_idx in self._forward_iter():
-            next_state, pf_params = self.get_next_state(cur_state, cur_time, **kwargs)
+            # Get parameters of p_F(-| x_t).
+            pf_params = self.forward_conditional.params(cur_state, cur_time)
+
+            exploration_std = (
+                exploration_schedule(cur_time) if exploration_schedule else 0.0
+            )
+
+            # Sample x_{t+1} ~ p_F(-| x_t) using parameters.
+            next_state = self.forward_conditional.sample(
+                pf_params, exploration_std=exploration_std
+            )
+            if not self.backprop_through_state:
+                next_state = next_state.detach()
 
             trajectories[:, next_idx] = next_state
 
-            logpf[:, cur_idx] = self.get_forward_logprob(
-                next_state, cur_state, pf_params
-            )
+            logpf[:, cur_idx] = self.forward_conditional.log_prob(next_state, pf_params)
 
-            pb_params = self.get_backward_params(next_state, next_time)
+            # Get parameters of p_B(-|x_{t+1}).
+            pb_params = self.backward_conditional.params(next_state, next_time)
 
-            logpb[:, cur_idx] = self.get_backward_logprob(
-                cur_state, next_state, pb_params
-            )
+            # Get probability of p_B(x_t|x_{t+1})
+            logpb[:, cur_idx] = self.backward_conditional.log_prob(cur_state, pb_params)
 
             # This step is essential for back prop to work properly.
             # Reading cur_state from trajectory tensor will cause error.
@@ -171,7 +143,9 @@ class SamplerModel(torch.nn.Module, metaclass=abc.ABCMeta):
         return trajectories, logpf, logpb
 
     def get_backward_trajectory(
-        self, final_states: torch.Tensor, **kwargs
+        self,
+        final_states: torch.Tensor,
+        exploration_schedule: Optional[Callable[[float], float]] = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Generate backward trajectory from given final states.
@@ -191,24 +165,39 @@ class SamplerModel(torch.nn.Module, metaclass=abc.ABCMeta):
 
         batch_size = final_states.shape[0]
 
+        # Create empty (zero) tensor with corresponding size.
         logpf, logpb, trajectories = self._allocate_memory(batch_size)
 
         trajectories[:, -1] = cur_state = final_states
 
         for cur_time, prev_time, cur_idx, prev_idx in self._backward_iter():
-            prev_state, pb_params = self.get_prev_state(cur_state, cur_time, **kwargs)
+            # Get parameters of p_B(-| x_t).
+            pb_params = self.backward_conditional.params(cur_state, cur_time)
 
-            logpb[:, prev_idx] = self.get_backward_logprob(
-                prev_state, cur_state, pb_params
+            exploration_std = (
+                exploration_schedule(cur_time) if exploration_schedule else 0.0
             )
+
+            # Sample x_{t-1} ~ p_B(-| x_t) using parameters.
+            prev_state = self.backward_conditional.sample(
+                pb_params, exploration_std=exploration_std
+            )
+            if not self.backprop_through_state:
+                prev_state = prev_state.detach()
 
             trajectories[:, prev_idx] = prev_state
-
-            pf_params = self.get_forward_params(prev_state, prev_time)
-            logpf[:, prev_idx] = self.get_forward_logprob(
-                cur_state, prev_state, pf_params
+            logpb[:, prev_idx] = self.backward_conditional.log_prob(
+                prev_state, pb_params
             )
 
+            # Get parameters of p_F(-| x_{t-1}).
+            pf_params = self.forward_conditional.params(prev_state, prev_time)
+
+            # Get probability of p_F(x_t| x_{t-1}).
+            logpf[:, prev_idx] = self.forward_conditional.log_prob(cur_state, pf_params)
+
+            # This step is essential for back prop to work properly.
+            # Reading cur_state from trajectory tensor will cause error.
             cur_state = prev_state
 
         return trajectories, logpf, logpb
@@ -217,6 +206,29 @@ class SamplerModel(torch.nn.Module, metaclass=abc.ABCMeta):
         initial_states = self.generate_initial_state(batch_size)
         trajectories, _, _ = self.get_forward_trajectory(initial_states)
         return trajectories[:, -1]
+
+    def sleep_phase_sample(
+        self,
+        batch_size: int,
+        exploration_schedule: Optional[Callable[[float], float]] = None,
+    ) -> torch.Tensor:
+        initial_states = self.generate_initial_state(batch_size)
+
+        trajectories, _, _ = self.get_forward_trajectory(
+            initial_states, exploration_schedule
+        )
+
+        return trajectories[:, -1]
+
+    def forward(
+        self,
+        state: torch.Tensor,
+        exploration_schedule: Optional[Callable[[float], float]] = None,
+    ):
+        """
+        Dummy forward function. Do not use this.
+        """
+        return self.get_forward_trajectory(state, exploration_schedule)
 
     def _allocate_memory(self, batch_size: int):
         """

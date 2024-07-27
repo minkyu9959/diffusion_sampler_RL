@@ -3,6 +3,7 @@ from .gfn_loss import (
     vargrad_loss,
     detailed_balance_loss,
     mle_loss,
+    annealed_db,
     GFNForwardLossWrapper,
     GFNBackwardLossWrapper,
 )
@@ -29,6 +30,9 @@ def get_gfn_forward_loss(
     elif loss_type == "db":
         return GFNForwardLossWrapper(detailed_balance_loss)
 
+    elif loss_type == "annealed_db":
+        return GFNForwardLossWrapper(annealed_db)
+
     elif loss_type == "pis":
         return pis
 
@@ -42,6 +46,9 @@ def get_gfn_backward_loss(loss_type: str) -> Callable:
 
     elif loss_type == "tb-avg":
         return GFNBackwardLossWrapper(vargrad_loss)
+
+    elif loss_type == "annealed_db":
+        return GFNBackwardLossWrapper(annealed_db)
 
     elif loss_type == "mle":
         return GFNBackwardLossWrapper(mle_loss)

@@ -1,0 +1,19 @@
+_target_: models.AnnealedGFN
+
+defaults:
+  - components@state_encoder: StateEncoding-PIS
+
+  - components@time_encoder: TimeEncoding-PIS
+
+  - components@flow_model: FlowModel-PIS
+
+  - conditional_density@forward_conditional: LearnedDiffusionConditional
+
+  - conditional_density@backward_conditional: LearnedDiffusionConditional
+
+  - prior_energy: Gaussian
+
+state_encoder:
+  s_dim: ${energy.dim}
+
+trajectory_length: 100
