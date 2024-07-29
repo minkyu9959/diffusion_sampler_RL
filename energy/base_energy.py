@@ -5,7 +5,7 @@ from typing import Optional, Callable
 
 
 """
-------- Guide for new energy function task implementation -------
+------- Guide for new energy function implementation -------
 
 Make new energy function as subclass as BaseEnergy.
 
