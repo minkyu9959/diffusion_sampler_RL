@@ -17,6 +17,7 @@ class ControlledMCConditional(ConditionalDensity):
     def __init__(
         self,
         dt: float,
+        sample_dim: int,
         state_encoder: torch.nn.Module,
         time_encoder: torch.nn.Module,
         control_model: torch.nn.Module,
@@ -28,6 +29,8 @@ class ControlledMCConditional(ConditionalDensity):
         gfn_clip: float = 1e4,
     ):
         self.do_control_plus_score = do_control_plus_score
+
+        self.sample_dim = sample_dim
 
         self.dt = dt
 
@@ -70,7 +73,7 @@ class ControlledMCConditional(ConditionalDensity):
         if self.clipping:
             mean_and_logvar = torch.clip(mean_and_logvar, -self.gfn_clip, self.gfn_clip)
 
-        mean, _ = gaussian_params(mean_and_logvar)
+        mean, logvar = gaussian_params(mean_and_logvar)
 
         # mask the model output and set the variance as constant.
         logvar = torch.full_like(logvar, np.log(self.base_std) * 2.0 + np.log(2))
