@@ -47,7 +47,6 @@ class BaseTrainer(abc.ABC):
     def initialize(self):
         pass
 
-    @abc.abstractmethod
     def train_step(self) -> float:
         """
         Execute one training step and return train loss.
@@ -55,7 +54,7 @@ class BaseTrainer(abc.ABC):
         Returns:
             loss: training loss
         """
-        pass
+        raise NotImplementedError("train_step method must be implemented.")
 
     def eval_step(self) -> dict:
         """

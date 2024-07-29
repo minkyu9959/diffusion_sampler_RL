@@ -136,7 +136,7 @@ class SampleBasedGFNTrainer(GFNTrainer):
 
         samples = energy.sample(train_cfg.batch_size, device=train_cfg.device)
 
-        loss = self.loss_fn(samples, self.model, energy.log_reward)
+        loss = self.loss_fn(self.model, sample=samples)
 
         loss.backward()
         self.optimizer.step()
