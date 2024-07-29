@@ -18,7 +18,7 @@ class GaussianEnergy(BaseEnergy):
 
         self.log_two_pi = np.log(2 * np.pi)
 
-        self._ground_truth_logZ = 0.5 * (self.log_two_pi + self.logvar)
+        self._ground_truth_logZ = (dim / 2) * (self.log_two_pi + self.logvar)
 
     @property
     def var(self):
