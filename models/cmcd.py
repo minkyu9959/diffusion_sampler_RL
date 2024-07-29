@@ -30,11 +30,10 @@ class CMCDSampler(SamplerModel):
     ):
         super(CMCDSampler, self).__init__(
             energy_function=energy_function,
+            prior_energy=prior_energy,
             trajectory_length=trajectory_length,
             device=device,
         )
-
-        self.prior_energy = prior_energy
 
         self.annealed_energy = AnnealedDensities(
             energy_function=energy_function, prior_energy=prior_energy
@@ -47,6 +46,7 @@ class CMCDSampler(SamplerModel):
 
         self.forward_conditional = ControlledMCConditional(
             dt=self.dt,
+            sample_dim=self.sample_dim,
             state_encoder=self.state_encoder,
             time_encoder=self.time_encoder,
             control_model=self.control_model,
@@ -60,6 +60,7 @@ class CMCDSampler(SamplerModel):
 
         self.backward_conditional = ControlledMCConditional(
             dt=self.dt,
+            sample_dim=self.sample_dim,
             state_encoder=self.state_encoder,
             time_encoder=self.time_encoder,
             control_model=self.control_model,
