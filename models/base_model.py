@@ -26,6 +26,8 @@ from typing import Optional, Callable
 
 import torch
 
+from omegaconf import DictConfig
+
 from .components.conditional_density import ConditionalDensity
 
 from energy import BaseEnergy
@@ -260,3 +262,6 @@ class SamplerModel(torch.nn.Module):
             prev_time = prev_idx * self.dt
 
             yield (cur_time, prev_time, cur_idx, prev_idx)
+
+    def get_optimizer(self, optimizer_cfg: DictConfig):
+        raise NotImplementedError("get_optimizer method must be implemented.")
