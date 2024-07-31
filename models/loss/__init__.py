@@ -10,16 +10,19 @@ from .gfn_loss import (
 from .pis import pis
 
 
+from models import SamplerModel
+from torch import Tensor
+
 from typing import Callable
 
 
-def get_gfn_forward_loss(
+def get_forward_loss(
     loss_type: str,
-) -> Callable:
+) -> Callable[[SamplerModel, int, Callable, bool], Tensor]:
     """
     Get forward loss function based on the loss type.
     Returned loss functions have common interface.
-    loss_fn(initial_state, gfn, log_reward_fn, exploration_std=None, return_exp=False)
+    loss_fn(model, batch_size, exploration_schedule=None, return_experience=False)
     """
     if loss_type == "tb":
         return GFNForwardLossWrapper(trajectory_balance_loss)
@@ -40,7 +43,13 @@ def get_gfn_forward_loss(
         return Exception("Invalid forward loss type")
 
 
-def get_gfn_backward_loss(loss_type: str) -> Callable:
+def get_backward_loss(loss_type: str) -> Callable[[SamplerModel, Tensor], Tensor]:
+    """
+    Get backward loss function based on the loss type.
+    Returned loss functions have common interface.
+    loss_fn(model: SamplerModel, sample: torch.Tensor)
+    """
+
     if loss_type == "tb":
         return GFNBackwardLossWrapper(trajectory_balance_loss)
 
