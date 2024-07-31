@@ -1,0 +1,10 @@
+# @package _global_
+
+energy:
+  _target_: energy.gmm.GMM1
+  dim: 2
+
+eval:
+  plot:
+    plotting_bounds: [-3.0, 3.0]
+    fig_size: [12, 7]

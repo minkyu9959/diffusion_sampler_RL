@@ -1,0 +1,23 @@
+# @package _global_
+
+defaults:
+  - override /model: CMCD
+  - override /train: OnPolicy
+
+train:
+  train_mode: fwd
+  fwd_loss: annealed_db
+
+  exploratory: false
+
+  epochs: 10000
+
+  buffer: null
+
+  local_search: null
+
+  optimizer:
+    lr_policy: 1e-4
+    lr_flow: 1e-1
+    weight_decay: 1e-7
+    use_weight_decay: true

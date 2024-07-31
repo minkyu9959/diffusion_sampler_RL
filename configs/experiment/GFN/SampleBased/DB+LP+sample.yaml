@@ -1,0 +1,12 @@
+# @package _global_
+
+defaults:
+  - override /model: GFN-PIS
+  - override /train: SampleBased
+
+model:
+  backward_model: null
+
+train:
+  epochs: 10000
+  bwd_loss: db

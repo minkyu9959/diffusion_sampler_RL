@@ -5,11 +5,11 @@ device: "cuda:0"
 defaults:
   - energy: manywell
   - model: GFN
-  - train: GFN+OffPolicy
+  - train: OnPolicy
   - _self_
 
   # Experiments config file can override the default option.
-  - experiment: GFN/TB+Expl
+  - experiment: GFN/OnPolicy/TB+Expl
 
 train:
   trainer:

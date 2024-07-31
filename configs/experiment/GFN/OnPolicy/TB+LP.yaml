@@ -1,18 +1,17 @@
 # @package _global_
 
-wandb:
-  tags: ["TB", "On-policy"]
-
 defaults:
   - override /model: GFN-PIS
-  - override /train: GFN+OnPolicy
+  - override /train: OnPolicy
 
 model:
   backward_model: null
-  langevin_scaler: null
   flow_model: null
 
-train:
-  fwd_loss: tb
+  langevin_scaler:
+    out_dim: 1
 
+train:
+  epochs: 10000
+  fwd_loss: tb
   exploratory: false

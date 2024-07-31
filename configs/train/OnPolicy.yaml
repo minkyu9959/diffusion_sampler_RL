@@ -1,10 +1,8 @@
 trainer:
-  _target_: trainer.gfn.GFNTrainer.GFNOnPolicyTrainer
+  _target_: trainer.trajectory_wise_trainer.OnPolicyTrainer
 
 epochs: 25000
 batch_size: 300
-
-subtb_lambda: 2
 
 fwd_loss: tb
 

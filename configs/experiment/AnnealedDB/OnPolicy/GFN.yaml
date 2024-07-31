@@ -1,11 +1,8 @@
 # @package _global_
 
-wandb:
-  tags: ["AnnealedGFN", "LP"]
-
 defaults:
   - override /model: AnnealedGFN
-  - override /train: GFN+OnPolicy
+  - override /train: OnPolicy
 
 train:
   train_mode: fwd
@@ -14,7 +11,3 @@ train:
   exploratory: false
 
   epochs: 10000
-
-  buffer: null
-
-  local_search: null

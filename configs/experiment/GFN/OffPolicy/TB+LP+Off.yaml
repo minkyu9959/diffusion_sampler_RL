@@ -1,11 +1,8 @@
 # @package _global_
 
-wandb:
-  tags: ["TB", "Expl", "LS", "LP"]
-
 defaults:
   - override /model: GFN-PIS
-  - override /train: GFN+OffPolicy
+  - override /train: OffPolicy
 
 model:
   backward_model: null
@@ -16,10 +13,9 @@ model:
 
 train:
   epochs: 10000
-
   fwd_loss: tb
   bwd_loss: tb
 
-  exploratory: true
-  exploration_wd: true
-  exploration_factor: 0.1
+  exploratory: false
+
+  local_serach: null

@@ -1,17 +1,13 @@
 # @package _global_
 
-wandb:
-  tags: ["TB", "Sample-based"]
-
 defaults:
   - override /model: GFN-PIS
-  - override /train: GFN+SampleBased
+  - override /train: SampleBased
 
 model:
   backward_model: null
   flow_model: null
 
 train:
-  fwd_loss: tb
-
-  exploratory: false
+  epochs: 10000
+  bwd_loss: tb

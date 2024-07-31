@@ -1,11 +1,8 @@
 # @package _global_
 
-wandb:
-  tags: ["DB", "On-policy"]
-
 defaults:
   - override /model: GFN-PIS
-  - override /train: GFN+OnPolicy
+  - override /train: OnPolicy
 
 model:
   backward_model: null

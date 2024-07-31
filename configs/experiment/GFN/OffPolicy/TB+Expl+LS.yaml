@@ -1,11 +1,8 @@
 # @package _global_
 
-wandb:
-  tags: ["TB", "Exploratory", "LS"]
-
 defaults:
   - override /model: GFN-PIS
-  - override /train: GFN+OffPolicy
+  - override /train: OffPolicy
 
 model:
   backward_model: null
