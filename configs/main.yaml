@@ -3,7 +3,7 @@ seed: 12345
 device: "cuda:0"
 
 defaults:
-  - energy: manywell
+  - energy: ManyWell
   - model: GFN
   - train: OnPolicy
   - _self_
