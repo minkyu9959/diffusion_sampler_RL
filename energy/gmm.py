@@ -51,6 +51,18 @@ class GaussianMixture(BaseEnergy):
         return self.gmm.sample((batch_size,))
 
 
+class GMM1(GaussianMixture):
+    def __init__(self, device: str, dim: int):
+        mode_list = torch.tensor([(0.0, 0.0)], device=device)
+
+        super().__init__(
+            device=device,
+            mode_list=mode_list,
+            dim=dim,
+            scale=1.0,
+        )
+
+
 class GMM9(GaussianMixture):
     def __init__(self, device: str, dim: int, scale: float = 0.5477222):
 
