@@ -32,12 +32,15 @@ class GaussianEnergy(BaseEnergy):
         return torch.randn((batch_size, self.ndim), device=self.device) * self.sigma
 
     def energy(self, x: torch.Tensor):
+        assert x.shape[-1] == self.ndim
         return 0.5 * (x**2).sum(-1) / self.var
 
     def score(self, x: torch.Tensor):
+        assert x.shape[-1] == self.ndim
         return -x / self.var
 
     def log_prob(self, x: torch.Tensor):
+        assert x.shape[-1] == self.ndim
         return -self.energy(x) - self._ground_truth_logZ
 
 
@@ -50,6 +53,7 @@ class UniformEnergy(BaseEnergy):
         self.max_support = max_support
 
     def energy(self, x: torch.Tensor):
+        assert x.shape[-1] == self.ndim
         return torch.zeros(*x.shape[:-1], device=x.device)
 
     def _generate_sample(self, batch_size: int) -> torch.Tensor:
@@ -60,6 +64,7 @@ class UniformEnergy(BaseEnergy):
         )
 
     def score(self, x: torch.Tensor):
+        assert x.shape[-1] == self.ndim
         return torch.zeros_like(x)
 
 
@@ -68,6 +73,7 @@ class DiracDeltaEnergy(BaseEnergy):
     can_sample = True
 
     def energy(self, x: torch.Tensor):
+        assert x.shape[-1] == self.ndim
         return torch.zeros(*x.shape[:-1], device=x.device)
 
     def _generate_sample(self, batch_size: int) -> torch.Tensor:
