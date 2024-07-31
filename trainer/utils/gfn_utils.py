@@ -10,24 +10,6 @@ from energy import BaseEnergy
 from omegaconf import DictConfig
 
 
-def calculate_subtb_coeff_matrix(lamda, N):
-    """
-    diff_matrix: (N+1, N+1)
-    0, 1, 2, ...
-    -1, 0, 1, ...
-    -2, -1, 0, ...
-
-    self.coef[i, j] = lamda^(j-i) / total_lambda  if i < j else 0.
-    """
-    range_vals = torch.arange(N + 1)
-    diff_matrix = range_vals - range_vals.view(-1, 1)
-    B = np.log(lamda) * diff_matrix
-    B[diff_matrix <= 0] = -np.inf
-    log_total_lambda = torch.logsumexp(B.view(-1), dim=0)
-    coef = torch.exp(B - log_total_lambda)
-    return coef
-
-
 def get_buffer(
     buffer_cfg: Optional[DictConfig], energy_function: BaseEnergy
 ) -> Optional[BaseBuffer]:

@@ -13,7 +13,7 @@ from models import SamplerModel
 from buffer import *
 
 from metrics import compute_all_metrics, add_prefix_to_dict_key
-from trainer.utils import save_model, get_experiment_name, fig_to_image
+from .utils.etc import save_model, fig_to_image, get_experiment_output_dir
 
 
 class BaseTrainer(abc.ABC):
@@ -42,6 +42,8 @@ class BaseTrainer(abc.ABC):
 
         self.current_epoch = 0
         self.max_epoch = train_cfg.epochs
+
+        self.optimizer = self.model.get_optimizer(train_cfg.optimizer)
 
     @abc.abstractmethod
     def initialize(self):
@@ -99,7 +101,7 @@ class BaseTrainer(abc.ABC):
         Returns:
             dict: dictionary that has wandb Image objects as value
         """
-        plot_filename_prefix = get_experiment_name()
+        output_dir = get_experiment_output_dir()
         plot_sample_size = self.eval_cfg.plot_sample_size
 
         model = self.model
@@ -108,7 +110,7 @@ class BaseTrainer(abc.ABC):
 
         fig, _ = self.plotter.make_plot(samples)
 
-        fig.savefig(f"{plot_filename_prefix}plot.pdf", bbox_inches="tight")
+        fig.savefig(f"{output_dir}/plot.pdf", bbox_inches="tight")
 
         return {
             "visualization/plot": wandb.Image(fig_to_image(fig)),

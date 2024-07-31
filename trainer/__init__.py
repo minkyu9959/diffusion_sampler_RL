@@ -1,8 +1,6 @@
 from .base_trainer import BaseTrainer
-from .utils import (
+from .utils.etc import (
     check_config_and_set_read_only,
-    set_name_from_config,
-    get_experiment_name,
-    fig_to_image,
-    save_model,
+    set_experiment_output_dir,
+    make_wandb_tag,
 )

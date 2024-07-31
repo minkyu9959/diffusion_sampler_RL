@@ -11,14 +11,15 @@ from omegaconf import DictConfig, OmegaConf
 
 import wandb
 
-from trainer.utils import (
+from trainer import (
+    BaseTrainer,
     check_config_and_set_read_only,
-    set_name_from_config,
+    make_wandb_tag,
+    set_experiment_output_dir,
 )
 
 from energy import BaseEnergy, get_energy_function
 from models import get_model
-from trainer import BaseTrainer
 
 
 def train(cfg: DictConfig, model: torch.nn.Module, energy_function: BaseEnergy):
@@ -43,15 +44,13 @@ def main(cfg: DictConfig) -> None:
 
     check_config_and_set_read_only(cfg)
 
+    set_experiment_output_dir()
+
     set_seed(cfg.seed)
 
     energy_function: BaseEnergy = get_energy_function(cfg)
 
     model: torch.nn.Module = get_model(cfg, energy_function).to(cfg.device)
-
-    experiment_name = set_name_from_config(cfg)
-    if not os.path.exists(experiment_name):
-        os.makedirs(experiment_name)
 
     # Wandb logging cannot accept OmegaConf object.
     # Convert it to python dictionary.
@@ -62,9 +61,13 @@ def main(cfg: DictConfig) -> None:
             project=cfg.wandb.project,
             entity="dywoo1247",
             config=cfg_dict,
-            name=experiment_name,
-            tags=cfg.wandb.get("tags"),
-            group=cfg.wandb.get("group"),
+            tags=make_wandb_tag(cfg),
+            group=cfg.wandb.get(
+                "group",
+                type(energy_function).__name__,
+                # If you not specified the group name,
+                # it will use the name of energy function by defaults.
+            ),
         )
 
     train(cfg, model, energy_function)

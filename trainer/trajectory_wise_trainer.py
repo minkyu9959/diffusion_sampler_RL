@@ -7,7 +7,7 @@ from buffer import *
 
 from trainer import BaseTrainer
 
-from models.loss import get_gfn_forward_loss, get_gfn_backward_loss
+from models.loss import get_forward_loss, get_backward_loss
 
 from .utils.gfn_utils import (
     get_buffer,
@@ -16,35 +16,18 @@ from .utils.gfn_utils import (
 from .utils.langevin import langevin_dynamics
 
 
-class GFNTrainer(BaseTrainer):
-    """Abstract class for GFN trainers."""
-
-    def set_optimizer(self):
-        self.optimizer = self.model.get_optimizer(self.train_cfg.optimizer)
-
-    def set_buffer(self):
-        train_cfg = self.train_cfg
-        self.buffer = get_buffer(train_cfg.buffer, self.energy_function)
-        self.local_search_buffer = get_buffer(train_cfg.buffer, self.energy_function)
-
-    def get_exploration_schedulde(self):
-        train_cfg = self.train_cfg
-
-        return get_exploration_std(
-            epoch=self.current_epoch,
-            exploratory=train_cfg.exploratory,
-            exploration_factor=train_cfg.exploration_factor,
-            exploration_wd=train_cfg.exploration_wd,
-        )
+def get_exploration_schedule(train_cfg, epoch: int):
+    return get_exploration_std(
+        epoch=epoch,
+        exploratory=train_cfg.exploratory,
+        exploration_factor=train_cfg.exploration_factor,
+        exploration_wd=train_cfg.exploration_wd,
+    )
 
 
-class GFNOnPolicyTrainer(GFNTrainer):
+class OnPolicyTrainer(BaseTrainer):
     def initialize(self):
-        self.set_optimizer()
-
-        train_cfg = self.train_cfg
-
-        self.loss_fn = get_gfn_forward_loss(train_cfg.fwd_loss)
+        self.loss_fn = get_forward_loss(self.train_cfg.fwd_loss)
 
     def train_step(self) -> float:
         self.model.zero_grad()
@@ -52,7 +35,9 @@ class GFNOnPolicyTrainer(GFNTrainer):
         loss = self.loss_fn(
             gfn=self.model,
             batch_size=self.train_cfg.batch_size,
-            exploration_schedule=self.get_exploration_schedulde(),
+            exploration_schedule=get_exploration_schedule(
+                self.train_cfg, self.current_epoch
+            ),
         )
 
         loss.backward()
@@ -60,19 +45,21 @@ class GFNOnPolicyTrainer(GFNTrainer):
         return loss.item()
 
 
-class GFNOffPolicyTrainer(GFNTrainer):
+class OffPolicyTrainer(BaseTrainer):
     def initialize(self):
-        self.set_optimizer()
         self.set_buffer()
 
-        train_cfg = self.train_cfg
+        self.fwd_loss_fn = get_forward_loss(self.train_cfg.fwd_loss)
+        self.bwd_loss_fn = get_backward_loss(self.train_cfg.bwd_loss)
 
-        self.fwd_loss_fn = get_gfn_forward_loss(train_cfg.fwd_loss)
-        self.bwd_loss_fn = get_gfn_backward_loss(train_cfg.bwd_loss)
+    def set_buffer(self):
+        train_cfg = self.train_cfg
+        self.buffer = get_buffer(train_cfg.buffer, self.energy_function)
+        self.local_search_buffer = get_buffer(train_cfg.buffer, self.energy_function)
 
     def train_step(self) -> float:
         self.model.zero_grad()
-        exploration_std = self.get_exploration_schedulde()
+        exploration_std = get_exploration_schedule(self.train_cfg, self.current_epoch)
 
         train_cfg = self.train_cfg
 
@@ -123,10 +110,9 @@ class GFNOffPolicyTrainer(GFNTrainer):
         return samples
 
 
-class SampleBasedGFNTrainer(GFNTrainer):
+class SampleBasedTrainer(BaseTrainer):
     def initialize(self):
-        self.set_optimizer()
-        self.loss_fn = get_gfn_backward_loss(self.train_cfg.bwd_loss)
+        self.loss_fn = get_backward_loss(self.train_cfg.bwd_loss)
 
     def train_step(self) -> float:
         self.model.zero_grad()
