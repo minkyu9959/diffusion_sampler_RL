@@ -153,6 +153,50 @@ class Plotter:
         else:
             ax.set_title(f"Sample plot")
 
+    def make_trajectory_plot(
+        self,
+        trajectory: torch.Tensor,
+        first_dim: Optional[int] = None,
+        second_dim: Optional[int] = None,
+    ):
+        trajectory_length = trajectory.size(1)
+
+        fig, ax = plt.subplots(1, 1, figsize=(12, 12))
+
+        self.draw_contour(ax, first_dim, second_dim)
+
+        if self.need_projection:
+            energy: HighDimensionalEnergy = self.energy_function
+            trajectory = energy.projection_on_2d(trajectory, first_dim, second_dim)
+
+        trajectory = trajectory.cpu().numpy()
+
+        # extract x, y coordinates.
+        traj_xs = trajectory[..., 0]
+        traj_ys = trajectory[..., 1]
+
+        # Plot each trajectory (maximum ten trajectory will be plotted).
+        for traj_x, traj_y, _ in zip(traj_xs, traj_ys, range(0, 10)):
+            ax.plot(traj_x, traj_y, color="black")
+
+            final_x = traj_x[-1]
+            dx = (traj_x[-1] - traj_x[-2]) / 10
+
+            final_y = traj_y[-1]
+            dy = (traj_y[-1] - traj_y[-2]) / 10
+
+            ax.arrow(
+                x=final_x,
+                y=final_y,
+                dx=dx / 10,
+                dy=dy / 10,
+                head_width=0.2,
+                edgecolor="black",
+                facecolor="black",
+            )
+
+        return fig, ax
+
     def make_sample_generation_animation(
         self,
         trajectory: torch.Tensor,
