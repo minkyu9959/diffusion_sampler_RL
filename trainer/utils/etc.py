@@ -34,7 +34,7 @@ def make_wandb_tag(cfg: DictConfig):
         tags.append(f"fwd_{cfg.train.fwd_loss}")
 
     if cfg.train.get("bwd_loss"):
-        tags.append(f"bwd_{cfg.train.fwd_loss}")
+        tags.append(f"bwd_{cfg.train.bwd_loss}")
 
     return tags
 
