@@ -44,7 +44,7 @@ class BrownianConditional(ConditionalDensity):
 
     def log_prob(self, state: Tensor, param: dict) -> Tensor:
         if param.get("deterministic"):
-            # We do not check the state is zero even though p_B(dt->0) is dirac delta.
+            # We do not check if the state is zero even though p_B(dt->0) is dirac delta.
             return torch.zeros(state.shape[:-1], device=state.device)
 
         mean, var = param["mean"], param["var"]
