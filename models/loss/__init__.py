@@ -62,5 +62,8 @@ def get_backward_loss(loss_type: str) -> Callable[[SamplerModel, Tensor], Tensor
     elif loss_type == "mle":
         return GFNBackwardLossWrapper(mle_loss)
 
+    elif loss_type == "db":
+        return GFNBackwardLossWrapper(detailed_balance_loss)
+
     else:
         raise Exception("Invalid backward loss type")
