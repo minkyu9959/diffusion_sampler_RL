@@ -1,4 +1,4 @@
-_target_: models.components.architectures.TimeEncoding
+_target_: models.components.architectures.TimeEncodingPIS
 
 harmonics_dim: 64
 
