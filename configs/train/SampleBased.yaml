@@ -5,10 +5,3 @@ epochs: 25000
 batch_size: 300
 
 bwd_loss: tb
-
-optimizer:
-  lr_policy: 1e-3
-  lr_flow: 1e-1
-  lr_back: 1e-3
-  weight_decay: 1e-7
-  use_weight_decay: false

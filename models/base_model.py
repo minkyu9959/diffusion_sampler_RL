@@ -45,6 +45,7 @@ class SamplerModel(torch.nn.Module):
         self,
         energy_function: BaseEnergy,
         prior_energy: BaseEnergy,
+        optimizer_cfg: DictConfig,
         trajectory_length: int = 100,
         device=torch.device("cuda"),
         backprop_through_state: bool = False,
@@ -53,6 +54,8 @@ class SamplerModel(torch.nn.Module):
 
         self.prior_energy = prior_energy
         self.energy_function = energy_function
+        self.optimizer_cfg = optimizer_cfg
+
         self.sample_dim = energy_function.data_ndim
         self.trajectory_length = trajectory_length
 
@@ -263,5 +266,5 @@ class SamplerModel(torch.nn.Module):
 
             yield (cur_time, prev_time, cur_idx, prev_idx)
 
-    def get_optimizer(self, optimizer_cfg: DictConfig):
+    def get_optimizer(self):
         raise NotImplementedError("get_optimizer method must be implemented.")

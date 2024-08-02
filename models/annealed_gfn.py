@@ -5,7 +5,7 @@ from omegaconf import DictConfig
 
 from typing import Optional, Any
 
-from energy import BaseEnergy, AnnealedDensities
+from energy import BaseEnergy, AnnealedDensities, DiracDeltaEnergy
 
 from .base_model import SamplerModel
 
@@ -24,6 +24,7 @@ class AnnealedGFN(SamplerModel):
         self,
         energy_function: BaseEnergy,
         prior_energy: BaseEnergy,
+        optimizer_cfg: DictConfig,
         trajectory_length: int,
         state_encoder: nn.Module,
         time_encoder: nn.Module,
@@ -35,10 +36,13 @@ class AnnealedGFN(SamplerModel):
         super(AnnealedGFN, self).__init__(
             energy_function=energy_function,
             prior_energy=prior_energy,
+            optimizer_cfg=optimizer_cfg,
             trajectory_length=trajectory_length,
             device=device,
             backprop_through_state=False,
         )
+
+        self.is_dirac_prior = type(prior_energy) == DiracDeltaEnergy
 
         self.annealed_energy = AnnealedDensities(
             energy_function=energy_function, prior_energy=prior_energy
@@ -70,7 +74,7 @@ class AnnealedGFN(SamplerModel):
         # Flow model
         self.conditional_flow_model = flow_model
 
-        # If flow is not learned, at least learn log Z (= total flow F(s_0))
+        # learn log Z (= total flow F(s_0))
         self.logZ = torch.nn.Parameter(torch.tensor(0.0, device=self.device))
 
         # log Z ratio estimator
@@ -109,6 +113,8 @@ class AnnealedGFN(SamplerModel):
     @property
     def learned_logZ(self):
         if self.conditional_flow_model is not None and self.is_dirac_prior:
+            # If we use dirac prior and we have flow model,
+            # we can calculate log Z as flow(x, 0).
             state = torch.zeros(self.sample_dim, device=self.device)
             time = 0.0
 
@@ -118,12 +124,15 @@ class AnnealedGFN(SamplerModel):
             flow = self.conditional_flow_model(encoded_state, encoded_time)
             return flow
         else:
+            # Else, flow(s) = log Z =/ flow(x, 0), so we return learned log Z.
             return self.logZ
 
     def get_logZ_ratio(self):
         return self.logZ_ratio
 
-    def get_optimizer(self, optimizer_cfg: DictConfig):
+    def param_groups(self):
+        optimizer_cfg: DictConfig = self.optimizer_cfg
+
         param_groups = [
             {"params": self.time_encoder.parameters()},
             {"params": self.state_encoder.parameters()},
@@ -151,6 +160,13 @@ class AnnealedGFN(SamplerModel):
 
         param_groups += [{"params": self.logZ, "lr": optimizer_cfg.lr_flow}]
         param_groups += [{"params": self.logZ_ratio, "lr": optimizer_cfg.lr_flow}]
+
+        return param_groups
+
+    def get_optimizer(self):
+        optimizer_cfg: DictConfig = self.optimizer_cfg
+
+        param_groups = self.param_groups()
 
         if optimizer_cfg.use_weight_decay:
             optimizer = torch.optim.Adam(

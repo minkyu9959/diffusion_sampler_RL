@@ -24,6 +24,7 @@ class GFN(SamplerModel):
         self,
         energy_function: BaseEnergy,
         prior_energy: BaseEnergy,
+        optimizer_cfg: DictConfig,
         trajectory_length: int,
         state_encoder: nn.Module,
         time_encoder: nn.Module,
@@ -44,6 +45,7 @@ class GFN(SamplerModel):
         super(GFN, self).__init__(
             energy_function=energy_function,
             prior_energy=prior_energy,
+            optimizer_cfg=optimizer_cfg,
             trajectory_length=trajectory_length,
             device=device,
             backprop_through_state=backprop_through_state,
@@ -142,7 +144,7 @@ class GFN(SamplerModel):
             encoded_state = self.state_encoder(state)
             encoded_time = self.time_encoder(time)
 
-            flow = self.conditional_flow_model(encoded_state, encoded_time)
+            flow = self.conditional_flow_model(encoded_state, encoded_time).squeeze(-1)
             return flow
         else:
             return self.logZ
@@ -150,7 +152,9 @@ class GFN(SamplerModel):
     def get_logZ_ratio(self):
         return self.logZ_ratio
 
-    def get_optimizer(self, optimizer_cfg: DictConfig):
+    def param_groups(self):
+        optimizer_cfg = self.optimizer_cfg
+
         param_groups = [
             {"params": self.time_encoder.parameters()},
             {"params": self.state_encoder.parameters()},
@@ -178,6 +182,12 @@ class GFN(SamplerModel):
 
         param_groups += [{"params": self.logZ, "lr": optimizer_cfg.lr_flow}]
         param_groups += [{"params": self.logZ_ratio, "lr": optimizer_cfg.lr_flow}]
+        return param_groups
+
+    def get_optimizer(self):
+        optimizer_cfg = self.optimizer_cfg
+
+        param_groups = self.param_groups()
 
         if optimizer_cfg.use_weight_decay:
             optimizer = torch.optim.Adam(

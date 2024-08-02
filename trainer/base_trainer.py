@@ -43,7 +43,7 @@ class BaseTrainer(abc.ABC):
         self.current_epoch = 0
         self.max_epoch = train_cfg.epochs
 
-        self.optimizer = self.model.get_optimizer(train_cfg.optimizer)
+        self.optimizer = self.model.get_optimizer()
 
     @abc.abstractmethod
     def initialize(self):
