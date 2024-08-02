@@ -6,6 +6,7 @@ from .old_gfn import GFN as OldGFN
 from .cmcd import CMCDSampler
 from .gfn import GFN
 from .annealed_gfn import AnnealedGFN
+from .double_gfn import DoubleGFN
 
 import torch
 
@@ -31,4 +32,5 @@ __all__ = [
     "GFN",
     "AnnealedGFN",
     "CMCDSampler",
+    "DoubleGFN",
 ]
