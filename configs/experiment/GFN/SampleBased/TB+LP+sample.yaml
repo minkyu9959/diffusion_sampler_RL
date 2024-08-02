@@ -7,6 +7,8 @@ defaults:
 model:
   backward_model: null
   flow_model: null
+  langevin_scaler:
+    out_dim: 1
 
 train:
   epochs: 10000
