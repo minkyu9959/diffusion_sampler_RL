@@ -128,3 +128,39 @@ class SampleBasedTrainer(BaseTrainer):
         self.optimizer.step()
 
         return loss.item()
+
+
+class TwoWayTrainer(BaseTrainer):
+    def initialize(self):
+        self.fwd_loss_fn = get_forward_loss(self.train_cfg.fwd_loss)
+        self.bwd_loss_fn = get_backward_loss(self.train_cfg.bwd_loss)
+
+    def train_step(self) -> float:
+        self.model.zero_grad()
+        exploration_std = get_exploration_schedule(self.train_cfg, self.current_epoch)
+
+        train_cfg = self.train_cfg
+
+        # For even epoch, train with forward trajectory
+        if self.current_epoch % 2 == 0:
+            loss = self.fwd_loss_fn(
+                self.model,
+                batch_size=train_cfg.batch_size,
+                exploration_schedule=exploration_std,
+            )
+
+        # For odd epoch, train with backward trajectory from groun truth sample
+        else:
+            samples = self.energy_function.sample(
+                train_cfg.batch_size, device=train_cfg.device
+            )
+
+            loss = self.bwd_loss_fn(
+                self.model,
+                samples,
+            )
+
+        loss.backward()
+        self.optimizer.step()
+
+        return loss.item()
