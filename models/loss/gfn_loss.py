@@ -49,14 +49,14 @@ def detailed_balance_loss(
     log_prior: Tensor,
     log_pfs: Tensor,
     log_pbs: Tensor,
-    log_fs: Tensor,
+    log_flows: Tensor,
     log_Z: Tensor,
     log_reward: Tensor,
 ):
-    log_fs[:, -1] = log_reward
+    log_flows[:, -1] = log_reward
 
-    loss = ((log_pfs + log_fs[:, :-1] - log_pbs - log_fs[:, 1:]) ** 2).sum(-1)
-    loss += (log_Z + log_prior - log_fs[:, 0]) ** 2
+    loss = ((log_pfs + log_flows[:, :-1] - log_pbs - log_flows[:, 1:]) ** 2).sum(-1)
+    loss += (log_Z + log_prior - log_flows[:, 0]) ** 2
 
     return (0.5 * loss).mean()
 
