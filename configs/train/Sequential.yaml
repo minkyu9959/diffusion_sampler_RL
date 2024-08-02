@@ -1,0 +1,11 @@
+trainer:
+  _target_: trainer.sequential_trainer.SequentialTrainer
+
+epochs: 25000
+batch_size: 300
+
+fwd_loss: tb
+
+exploratory: true
+exploration_factor: 0.1
+exploration_wd: true

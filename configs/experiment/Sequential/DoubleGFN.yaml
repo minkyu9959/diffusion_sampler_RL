@@ -1,0 +1,13 @@
+# @package _global_
+
+defaults:
+  - override /model: DoubleGFN
+  - override /train: Sequential
+
+train:
+  train_mode: fwd
+  fwd_loss: tb
+
+  epochs: 20000
+
+  exploratory: true
