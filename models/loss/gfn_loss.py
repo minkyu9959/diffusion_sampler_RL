@@ -61,7 +61,7 @@ def detailed_balance_loss(
     return (0.5 * loss).mean()
 
 
-def mle_loss(log_prior: Tensor, log_pfs: torch.Tensor):
+def mle_loss(log_prior: Tensor, log_pfs: torch.Tensor, log_pbs: torch.Tensor):
 
     loss = -(log_prior + log_pfs.sum(-1))
 
