@@ -4,7 +4,6 @@ import torch
 
 import matplotlib.pyplot as plt
 from tqdm import trange
-import wandb
 
 from omegaconf import DictConfig
 
@@ -13,7 +12,7 @@ from models import SamplerModel
 from buffer import *
 
 from metrics import compute_all_metrics, add_prefix_to_dict_key
-from .utils.etc import save_model, fig_to_image, get_experiment_output_dir
+from .utils.etc import get_experiment_output_dir
 
 
 class BaseTrainer(abc.ABC):
@@ -79,15 +78,7 @@ class BaseTrainer(abc.ABC):
             # At the end of training, we resample the evaluation data.
         )
 
-        if self.train_end:
-            metrics = add_prefix_to_dict_key("final_eval/", metrics)
-        else:
-            metrics = add_prefix_to_dict_key("eval/", metrics)
-
-        metrics.update(self.make_plot())
-
-        # Prevent too much plt objects from lasting
-        plt.close("all")
+        metrics = add_prefix_to_dict_key("eval/", metrics)
 
         return metrics
 
@@ -99,7 +90,7 @@ class BaseTrainer(abc.ABC):
         If you want to add more visualization, you can override this method.
 
         Returns:
-            dict: dictionary that has wandb Image objects as value
+            dict: dictionary that has figure objects as value
         """
         output_dir = get_experiment_output_dir()
         plot_sample_size = self.eval_cfg.plot_sample_size
@@ -113,48 +104,61 @@ class BaseTrainer(abc.ABC):
         fig.savefig(f"{output_dir}/plot.pdf", bbox_inches="tight")
 
         return {
-            "visualization/plot": wandb.Image(fig_to_image(fig)),
+            "visuals/sample-plot": fig,
         }
 
     def train(self):
         # Initialize some variables (e.g., optimizer, buffer, frequently used values)
         self.initialize()
 
-        # A dictionary to save metric value
-        metrics = dict()
-
-        # Traininig
         self.model.train()
         for epoch in trange(self.max_epoch + 1):
             self.current_epoch = epoch
 
-            metrics["train/loss"] = self.train_step()
+            loss = self.train_step()
+
+            self.log_loss_to_run(loss)
 
             if self.must_eval(epoch):
-                metrics.update(self.eval_step())
+                self.log_metric_to_run(self.eval_step())
 
-                if wandb.run is not None:
-                    wandb.log(metrics, step=epoch)
+                self.log_visual_to_run(self.make_plot())
+
+                # Prevent too much plt objects from lasting
+                plt.close("all")
 
             if self.must_save(epoch):
                 self.save_model()
 
-        # Final evaluation and save model
-        metrics.update(self.eval_step())
-        self.save_model()
+    def log_loss_to_run(self, loss: float):
+        self.run["train/loss"].append(loss)
 
-        if wandb.run is not None:
-            wandb.log(metrics)
+    def log_metric_to_run(self, metrics: dict):
+        epoch = self.current_epoch
+
+        for metric_name, metric_value in metrics.items():
+            self.run[metric_name].append(value=metric_value, step=epoch)
+
+    def log_visual_to_run(self, visuals: dict):
+        for visual_name, plot in visuals.items():
+            self.run[visual_name].append(plot, step=self.current_epoch)
 
     @property
     def train_end(self):
         return self.current_epoch == self.max_epoch
 
     def must_save(self, epoch: int = 0):
-        return epoch % self.eval_cfg.save_model_every_n_epoch == 0
+        return epoch % self.eval_cfg.save_model_every_n_epoch == 0 or self.train_end
 
     def must_eval(self, epoch: int = 0):
-        return epoch % self.eval_cfg.eval_every_n_epoch == 0
+        return epoch % self.eval_cfg.eval_every_n_epoch == 0 or self.train_end
 
     def save_model(self):
-        save_model(self.model, is_final=self.train_end)
+        final = "_final" if self.train_end else ""
+        output_dir = get_experiment_output_dir()
+
+        model_path = f"{output_dir}/model{final}.pt"
+
+        torch.save(self.model.state_dict(), model_path)
+
+        self.run[f"model_ckpts/epoch_{self.current_epoch}"].upload(model_path)

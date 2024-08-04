@@ -29,6 +29,3 @@ eval:
   eval_data_size: 2000
   final_eval_data_size: 2000
   plot_sample_size: 2000
-
-wandb:
-  project: "GFN Energy"

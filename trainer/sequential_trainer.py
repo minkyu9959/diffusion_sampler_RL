@@ -5,7 +5,6 @@ Train code for Sequential training of GFN.
 import torch
 
 import matplotlib.pyplot as plt
-import wandb
 
 from omegaconf import DictConfig
 
@@ -18,7 +17,7 @@ from energy import AnnealedDensities
 from trainer import BaseTrainer
 from metrics import compute_all_metrics, add_prefix_to_dict_key
 
-from .utils.etc import get_experiment_output_dir, fig_to_image
+from .utils.etc import get_experiment_output_dir
 
 
 from .utils.gfn_utils import get_exploration_std
@@ -109,11 +108,6 @@ class SequentialTrainer(BaseTrainer):
         else:
             metrics = add_prefix_to_dict_key("eval/", metrics)
 
-        metrics.update(self.make_plot())
-
-        # Prevent too much plt objects from lasting
-        plt.close("all")
-
         return metrics
 
     def make_plot(self):
@@ -124,7 +118,7 @@ class SequentialTrainer(BaseTrainer):
         If you want to add more visualization, you can override this method.
 
         Returns:
-            dict: dictionary that has wandb Image objects as value
+            dict: dictionary that has figure objects as value
         """
         output_dir = get_experiment_output_dir()
         plot_sample_size = self.eval_cfg.plot_sample_size
@@ -138,5 +132,5 @@ class SequentialTrainer(BaseTrainer):
         fig.savefig(f"{output_dir}/plot.pdf", bbox_inches="tight")
 
         return {
-            "visualization/plot": wandb.Image(fig_to_image(fig)),
+            "visuals/sample-plot": fig,
         }
