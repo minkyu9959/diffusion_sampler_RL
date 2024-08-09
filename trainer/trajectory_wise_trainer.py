@@ -3,14 +3,13 @@ Train code for GFN with local search buffer + Langevin parametrization
 (Sendera et al., 2024, Improved off-policy training of diffusion samplers)
 """
 
-from buffer import *
+from .buffer import get_buffer
 
 from trainer import BaseTrainer
 
 from models.loss import get_forward_loss, get_backward_loss
 
 from .utils.gfn_utils import (
-    get_buffer,
     get_exploration_std,
 )
 from .utils.langevin import langevin_dynamics
