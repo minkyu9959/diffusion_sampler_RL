@@ -17,8 +17,6 @@ from energy import AnnealedDensities
 from trainer import BaseTrainer
 from metrics import compute_all_metrics, add_prefix_to_dict_key
 
-from .utils.etc import get_experiment_output_dir
-
 
 from .utils.gfn_utils import get_exploration_std
 
@@ -98,39 +96,29 @@ class SequentialTrainer(BaseTrainer):
         elif self.stage == 1:
             model = self.model.second_gfn
 
-        metrics: dict = compute_all_metrics(
+        return compute_all_metrics(
             model=model,
             eval_data_size=eval_data_size,
         )
 
-        if self.train_end:
-            metrics = add_prefix_to_dict_key("final_eval/", metrics)
-        else:
-            metrics = add_prefix_to_dict_key("eval/", metrics)
-
-        return metrics
-
     def make_plot(self):
         """
-        Generate sample from model and plot it using energy function's make_plot method.
-        If energy function does not have make_plot method, return empty dict.
-
+        Generate sample from model and plot it using plotter.
         If you want to add more visualization, you can override this method.
 
         Returns:
             dict: dictionary that has figure objects as value
         """
-        output_dir = get_experiment_output_dir()
         plot_sample_size = self.eval_cfg.plot_sample_size
 
         model = self.model.first_gfn if self.stage == 0 else self.model.second_gfn
 
         samples = model.sample(batch_size=plot_sample_size)
 
-        fig, _ = self.plotter.make_plot(samples)
+        fig, _ = self.plotter.make_sample_plot(samples)
 
-        fig.savefig(f"{output_dir}/plot.pdf", bbox_inches="tight")
+        fig.savefig(f"{self.output_dir}/plot.pdf", bbox_inches="tight")
 
         return {
-            "visuals/sample-plot": fig,
+            "sample-plot": fig,
         }

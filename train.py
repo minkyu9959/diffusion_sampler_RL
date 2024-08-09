@@ -1,7 +1,4 @@
-import os
 import random
-
-from typing import Optional
 
 import torch
 import numpy as np
@@ -9,26 +6,19 @@ import numpy as np
 import hydra
 from hydra.utils import instantiate
 
-from omegaconf import DictConfig, OmegaConf
-
-import neptune
-
-from trainer import (
-    BaseTrainer,
-    check_config_and_set_read_only,
-    make_tag,
-    set_experiment_output_dir,
-)
+from omegaconf import DictConfig
 
 from energy import BaseEnergy, get_energy_function
 from models import get_model
 
+from trainer import BaseTrainer
+from logger import get_logger, Logger
+
+from configs.util import *
+
 
 def train(
-    cfg: DictConfig,
-    model: torch.nn.Module,
-    energy_function: BaseEnergy,
-    run: Optional[neptune.Run],
+    cfg: DictConfig, model: torch.nn.Module, energy_function: BaseEnergy, logger: Logger
 ):
     trainer: BaseTrainer = instantiate(
         cfg.train.trainer,
@@ -36,9 +26,8 @@ def train(
         energy_function=energy_function,
         train_cfg=cfg.train,
         eval_cfg=cfg.eval,
+        logger=logger,
     )
-
-    trainer.run = run
 
     trainer.train()
 
@@ -53,27 +42,16 @@ def main(cfg: DictConfig) -> None:
 
     check_config_and_set_read_only(cfg)
 
-    set_experiment_output_dir()
-
     set_seed(cfg.seed)
 
     energy_function: BaseEnergy = get_energy_function(cfg)
 
     model: torch.nn.Module = get_model(cfg, energy_function).to(cfg.device)
 
-    # logger cannot accept OmegaConf object.
-    # Convert it to python dictionary.
-    cfg_dict = OmegaConf.to_container(cfg)
+    output_dir = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
+    logger: Logger = get_logger(cfg, output_dir)
 
-    run = neptune.init_run(
-        project="dywoo1247/Diffusion-sampler", tags=make_tag(cfg), dependencies="infer"
-    )
-
-    run["parameters"] = cfg_dict
-
-    train(cfg, model, energy_function, run)
-
-    run.stop()
+    train(cfg, model, energy_function, logger)
 
 
 def set_seed(seed):
