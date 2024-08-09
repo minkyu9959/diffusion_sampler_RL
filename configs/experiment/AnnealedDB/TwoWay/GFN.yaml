@@ -10,4 +10,4 @@ train:
 
   epochs: 10000
 
-  exploratory: false
+  exploratory: true

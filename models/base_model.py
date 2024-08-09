@@ -267,4 +267,23 @@ class SamplerModel(torch.nn.Module):
             yield (cur_time, prev_time, cur_idx, prev_idx)
 
     def get_optimizer(self):
-        raise NotImplementedError("get_optimizer method must be implemented.")
+        optimizer_cfg = self.optimizer_cfg
+        learning_rate = optimizer_cfg.lr_policy
+
+        param_groups = self.param_groups()
+
+        if optimizer_cfg.get("AdamW"):
+            optim_cls: torch.optim.Optimizer = torch.optim.AdamW
+        else:
+            optim_cls: torch.optim.Optimizer = torch.optim.Adam
+
+        if optimizer_cfg.use_weight_decay:
+            optimizer = optim_cls(
+                param_groups,
+                learning_rate,
+                weight_decay=optimizer_cfg.weight_decay,
+            )
+        else:
+            optimizer = optim_cls(param_groups, learning_rate)
+
+        return optimizer

@@ -93,19 +93,3 @@ class CMCDSampler(SamplerModel):
 
         param_groups += [{"params": self.logZ_ratio, "lr": optimizer_cfg.lr_flow}]
         return param_groups
-
-    def get_optimizer(self):
-        optimizer_cfg = self.optimizer_cfg
-
-        param_groups = self.param_groups()
-
-        if optimizer_cfg.use_weight_decay:
-            optimizer = torch.optim.Adam(
-                param_groups,
-                optimizer_cfg.lr_policy,
-                weight_decay=optimizer_cfg.weight_decay,
-            )
-        else:
-            optimizer = torch.optim.Adam(param_groups, optimizer_cfg.lr_policy)
-
-        return optimizer

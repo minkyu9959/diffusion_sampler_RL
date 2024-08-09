@@ -28,10 +28,18 @@ class AnnealedGFN(SamplerModel):
         trajectory_length: int,
         state_encoder: nn.Module,
         time_encoder: nn.Module,
-        forward_conditional: Any,  # partial instance of DiffusionConditional
-        backward_conditional: Any,  # partial instance of DiffusionConditional
+        forward_policy: nn.Module,
+        backward_policy: nn.Module,
+        langevin_scaler: Any = None,  # partial instance of langevin scaler
+        clipping: bool = False,
+        lgv_clip: float = 1e2,
+        gfn_clip: float = 1e4,
+        learn_variance: bool = True,
+        log_var_range: float = 4.0,
+        base_std: float = 1.0,
         flow_model: Optional[torch.nn.Module] = None,
         device=torch.device("cuda"),
+        fixed_logZ_ratio: bool = False,
     ):
         super(AnnealedGFN, self).__init__(
             energy_function=energy_function,
@@ -50,26 +58,49 @@ class AnnealedGFN(SamplerModel):
 
         self.state_encoder = state_encoder
         self.time_encoder = time_encoder
+        self.forward_policy = forward_policy
+        self.backward_policy = backward_policy
 
-        self.forward_conditional: LearnedDiffusionConditional = forward_conditional(
+        self.langevin_parametrization = langevin_scaler is not None
+
+        if self.langevin_parametrization:
+            self.forward_langevin_scaler = langevin_scaler()
+            self.backward_langevin_scaler = langevin_scaler()
+        else:
+            self.forward_langevin_scaler = None
+            self.backward_langevin_scaler = None
+
+        self.forward_conditional = LearnedDiffusionConditional(
+            sample_dim=self.sample_dim,
             dt=self.dt,
             state_encoder=state_encoder,
             time_encoder=time_encoder,
+            joint_policy=self.forward_policy,
+            langevin_scaler=self.forward_langevin_scaler,
             score_fn=self.energy_function.score,
+            clipping=clipping,
+            lgv_clip=lgv_clip,
+            gfn_clip=gfn_clip,
+            learn_variance=learn_variance,
+            log_var_range=log_var_range,
+            base_std=base_std,
         )
 
-        self.backward_conditional: LearnedDiffusionConditional = backward_conditional(
+        self.backward_conditional = LearnedDiffusionConditional(
+            sample_dim=self.sample_dim,
             dt=self.dt,
             state_encoder=state_encoder,
             time_encoder=time_encoder,
+            joint_policy=self.backward_policy,
+            langevin_scaler=self.backward_langevin_scaler,
             score_fn=self.energy_function.score,
+            clipping=clipping,
+            lgv_clip=lgv_clip,
+            gfn_clip=gfn_clip,
+            learn_variance=learn_variance,
+            log_var_range=log_var_range,
+            base_std=base_std,
         )
-
-        # TODO: Refactor this part later.
-        self.forward_model = self.forward_conditional.joint_policy
-        self.backward_model = self.backward_conditional.joint_policy
-        self.fwd_lgv_scaler = self.forward_conditional.langevin_scaler
-        self.bwd_lgv_scaler = self.backward_conditional.langevin_scaler
 
         # Flow model
         self.conditional_flow_model = flow_model
@@ -77,10 +108,21 @@ class AnnealedGFN(SamplerModel):
         # learn log Z (= total flow F(s_0))
         self.logZ = torch.nn.Parameter(torch.tensor(0.0, device=self.device))
 
-        # log Z ratio estimator
-        self.logZ_ratio = torch.nn.Parameter(
-            torch.zeros(trajectory_length, device=device)
-        )
+        if fixed_logZ_ratio:
+            from eval.util import estimate_intermediate_logZ, logZ_to_ratio
+
+            logZ_ratio = logZ_to_ratio(
+                estimate_intermediate_logZ(
+                    self.annealed_energy, 10000, trajectory_length
+                )
+            )
+
+            self.logZ_ratio = torch.nn.Parameter(logZ_ratio, requires_grad=False)
+        else:
+            # log Z ratio estimator
+            self.logZ_ratio = torch.nn.Parameter(
+                torch.zeros(trajectory_length, device=device)
+            )
 
     def get_flow_from_trajectory(self, trajectory: torch.Tensor) -> torch.Tensor:
         if self.conditional_flow_model is None:
@@ -136,18 +178,14 @@ class AnnealedGFN(SamplerModel):
         param_groups = [
             {"params": self.time_encoder.parameters()},
             {"params": self.state_encoder.parameters()},
-            {"params": self.forward_conditional.joint_policy.parameters()},
-            {"params": self.backward_conditional.joint_policy.parameters()},
+            {"params": self.forward_policy.parameters()},
+            {"params": self.backward_policy.parameters()},
         ]
 
-        if self.forward_conditional.langevin_parametrization:
+        if self.langevin_parametrization:
             param_groups += [
-                {"params": self.forward_conditional.langevin_scaler.parameters()}
-            ]
-
-        if self.backward_conditional.langevin_parametrization:
-            param_groups += [
-                {"params": self.backward_conditional.langevin_scaler.parameters()}
+                {"params": self.forward_langevin_scaler.parameters()},
+                {"params": self.backward_langevin_scaler.parameters()},
             ]
 
         if self.conditional_flow_model is not None:
@@ -162,19 +200,3 @@ class AnnealedGFN(SamplerModel):
         param_groups += [{"params": self.logZ_ratio, "lr": optimizer_cfg.lr_flow}]
 
         return param_groups
-
-    def get_optimizer(self):
-        optimizer_cfg: DictConfig = self.optimizer_cfg
-
-        param_groups = self.param_groups()
-
-        if optimizer_cfg.use_weight_decay:
-            optimizer = torch.optim.Adam(
-                param_groups,
-                optimizer_cfg.lr_policy,
-                weight_decay=optimizer_cfg.weight_decay,
-            )
-        else:
-            optimizer = torch.optim.Adam(param_groups, optimizer_cfg.lr_policy)
-
-        return optimizer

@@ -11,8 +11,6 @@ defaults:
 
   - components@backward_policy: JointPolicy-PIS
 
-  - components@langevin_scaler: LangevinScaling-PIS
-
   - prior_energy: Gaussian
 
 state_encoder:
@@ -26,9 +24,7 @@ forward_policy:
 backward_policy:
   s_dim: ${energy.dim}
 
-langevin_scaler:
-  _partial_: true
-  out_dim: 1
+langevin_scaler: null
 
 clipping: true
 lgv_clip: 1e2

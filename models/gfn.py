@@ -62,6 +62,9 @@ class GFN(SamplerModel):
         self.backward_model = backward_model
         self.langevin_scaler = langevin_scaler
 
+        if langevin_scaler is not None:
+            self.langevin_parametrization = True
+
         # These two model predict the mean and variance of Gaussian density.
         forward_conditional = LearnedDiffusionConditional(
             self.sample_dim,
@@ -183,19 +186,3 @@ class GFN(SamplerModel):
         param_groups += [{"params": self.logZ, "lr": optimizer_cfg.lr_flow}]
         param_groups += [{"params": self.logZ_ratio, "lr": optimizer_cfg.lr_flow}]
         return param_groups
-
-    def get_optimizer(self):
-        optimizer_cfg = self.optimizer_cfg
-
-        param_groups = self.param_groups()
-
-        if optimizer_cfg.use_weight_decay:
-            optimizer = torch.optim.Adam(
-                param_groups,
-                optimizer_cfg.lr_policy,
-                weight_decay=optimizer_cfg.weight_decay,
-            )
-        else:
-            optimizer = torch.optim.Adam(param_groups, optimizer_cfg.lr_policy)
-
-        return optimizer
