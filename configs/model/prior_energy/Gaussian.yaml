@@ -5,4 +5,4 @@ dim: ${energy.dim}
 
 device: ${device}
 
-logvar: 0.0
+std: 1.0

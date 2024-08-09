@@ -1,5 +1,7 @@
 import numpy as np
 
+from typing import Optional
+
 import torch
 
 from .base_energy import BaseEnergy
@@ -11,10 +13,17 @@ class GaussianEnergy(BaseEnergy):
     logZ_is_available = True
     can_sample: bool = True
 
-    def __init__(self, device, dim, logvar):
+    def __init__(
+        self, device, dim, logvar: Optional[float] = None, std: Optional[float] = None
+    ):
         super().__init__(device, dim)
 
-        self.logvar = logvar
+        if logvar is not None:
+            self.logvar = logvar
+        elif std is not None:
+            self.logvar = np.log(std**2)
+        else:
+            raise Exception("Either logvar or std should be provided.")
 
         self.log_two_pi = np.log(2 * np.pi)
 
