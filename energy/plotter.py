@@ -12,7 +12,10 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.animation import FuncAnimation
 
+import seaborn as sns
 
+from .annealed_energy import AnnealedDensities
+from .annealed_logZ import estimate_intermediate_logZ
 from .base_energy import BaseEnergy, HighDimensionalEnergy
 
 
@@ -148,8 +151,8 @@ class Plotter:
         if self.need_projection:
             ax.set_title(f"Projected on x{first_dim}, x{second_dim}")
 
-            ax.set_ylabel(f"x{first_dim}")
-            ax.set_xlabel(f"x{second_dim}")
+            ax.set_ylabel(f"x{second_dim}")
+            ax.set_xlabel(f"x{first_dim}")
         else:
             ax.set_title(f"Sample plot")
 
@@ -228,7 +231,7 @@ class Plotter:
 
         return animation, fig, ax
 
-    def make_plot(self, sample: torch.Tensor):
+    def make_sample_plot(self, sample: torch.Tensor):
         """
         Make figure containing sample from the model.
 
@@ -254,18 +257,63 @@ class Plotter:
 
         # Energy function is 2D.
         else:
-            fig, axs = plt.subplots(1, 2, figsize=self.fig_size)
-            self.draw_contour_and_ground_truth_sample(axs[0])
-            self.draw_contour_and_sample(sample, axs[1])
+            fig, axs = plt.subplots(1, 1, figsize=self.fig_size)
+            self.draw_contour_and_sample(sample, axs)
 
         return fig, axs
+
+    def make_kde_plot(self, sample: torch.Tensor):
+        """KDE plot for sample."""
+
+        # Energy function is defined on high dimensional space.
+        if self.need_projection:
+            nrows = (len(self.projection_dims) + 1) // 2
+            ncols = 2
+
+            fig, axs = plt.subplots(nrows, ncols, figsize=self.fig_size)
+
+            for (proj_dim_1, proj_dim_2), ax in zip(
+                self.projection_dims, axs.flatten()
+            ):
+                proj_sample = self.energy_function.projection_on_2d(
+                    sample, proj_dim_1, proj_dim_2
+                )
+                draw_2D_kde(proj_sample, ax, self.plotting_bounds)
+
+        # Energy function is 2D.
+        else:
+            fig, axs = plt.subplots(1, 1, figsize=self.fig_size)
+            draw_2D_kde(sample, axs, self.plotting_bounds)
+
+        return fig, axs
+
+    def make_time_logZ_plot(self, prior: BaseEnergy, logZ_ratio: torch.Tensor):
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+
+        draw_time_logZ_plot(ax, self.energy_function, prior)
+
+        learned_logZ = logZ_ratio.detach().cumsum(dim=0) + prior.ground_truth_logZ
+
+        ax.plot(
+            learned_logZ.cpu().numpy(),
+            linewidth=3.0,
+            label="Learned logZ_t",
+        )
+        ax.set_xlabel("Trajectory length")
+        ax.set_ylabel("logZ_t")
+
+        ax.legend()
+
+        return fig, ax
 
 
 def get_points_on_2D_grid(
     bounds: tuple, grid_width_n_points: int, device: Optional[str] = "cpu"
 ):
     """
-    For points on the grid (bounds[0], bounds[1]) with n points at each side,
+    For points on the grid
+    (bounds[0], bounds[1]) x (bounds[0], bounds[1])
+    with n points at each side,
     make the list of points on the grid whose shape are (n**2, 2).
     """
 
@@ -284,7 +332,9 @@ def get_points_on_2D_grid(
 
 def make_2D_meshgrid(bounds: tuple, grid_width_n_points: int):
     """
-    For points on the grid (bounds[0], bounds[1]) with n points at each side,
+    For points on the grid
+    (bounds[0], bounds[1]) x (bounds[0], bounds[1])
+    with n points at each side,
     make meshgrid tensor X, Y whose shape are (n, n).
     """
     grid_lower_lim, grid_upper_lim = bounds
@@ -347,3 +397,27 @@ def draw_2D_sample(sample: torch.Tensor, ax: Axes, bounds: tuple, alpha: float =
     sample = sample.cpu().detach()
     sample = torch.clamp(sample, plot_lower_lim, plot_upper_lim)
     return ax.scatter(sample[:, 0], sample[:, 1], alpha=alpha, marker="o", s=10)
+
+
+def draw_2D_kde(sample: torch.Tensor, ax: Axes, bounds: tuple):
+    sample = sample.cpu().detach()
+    return sns.kdeplot(
+        x=sample[:, 0], y=sample[:, 1], cmap="Blues", fill=True, ax=ax, clip=bounds
+    )
+
+
+def draw_time_logZ_plot(ax: Axes, energy: BaseEnergy, prior: BaseEnergy):
+
+    energy_name = energy.__class__.__name__.split(".")[-1]
+    prior_name = prior.__class__.__name__.split(".")[-1]
+
+    annealed_density = AnnealedDensities(energy, prior)
+    log_Z = estimate_intermediate_logZ(annealed_density, 100000, 100)
+
+    line_object = ax.plot(log_Z.cpu().numpy(), linewidth=3, label="GT logZ_t")
+
+    ax.set_title(f"{energy_name} - {prior_name} - logvar = {prior.logvar}")
+    ax.set_xlabel("Trajectory length")
+    ax.set_ylabel("logZ_t")
+
+    return line_object
