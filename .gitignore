@@ -7,6 +7,9 @@ results_pis_architectures
 
 multirun
 
+eval
+scripts
+
 .neptune
 .env
 .vscode
