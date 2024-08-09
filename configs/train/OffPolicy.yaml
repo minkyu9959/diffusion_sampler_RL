@@ -15,7 +15,7 @@ buffer:
   buffer_size: 600000
   # 300 * 1000 * 2
   batch_size: ${train.batch_size}
-  prioritized: true
+  prioritized: "rank"
   rank_weight: 1e-2
   device: ${device}
   beta: 1.0
