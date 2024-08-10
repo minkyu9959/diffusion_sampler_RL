@@ -19,6 +19,9 @@ class NeptuneLogger(Logger):
             name=cfg.get("name"),
         )
 
+        if group_tag := cfg.get("group_tag"):
+            self.run["sys/group_tags"].add(group_tag)
+
         # neptune logger cannot accept OmegaConf object.
         # Convert it to python dictionary.
         self.run["parameters"] = OmegaConf.to_container(cfg)
