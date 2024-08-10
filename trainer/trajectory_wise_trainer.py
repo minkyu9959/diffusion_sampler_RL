@@ -108,6 +108,16 @@ class OffPolicyTrainer(BaseTrainer):
 
         return samples
 
+    def make_plot(self):
+        plot_dict = super(OffPolicyTrainer, self).make_plot()
+
+        samples = self.sample_from_buffer()
+        buffer_sample_fig, _ = self.plotter.make_sample_plot(samples)
+
+        plot_dict["buffer-sample"] = buffer_sample_fig
+
+        return plot_dict
+
 
 class SampleBasedTrainer(BaseTrainer):
     def initialize(self):
