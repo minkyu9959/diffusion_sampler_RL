@@ -5,7 +5,6 @@ defaults:
   - override /train: OffPolicy
 
 train:
-  train_mode: both_ways
   fwd_loss: annealed_db
   bwd_loss: annealed_db
 

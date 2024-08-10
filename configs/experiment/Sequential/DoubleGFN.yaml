@@ -5,9 +5,7 @@ defaults:
   - override /train: Sequential
 
 train:
-  train_mode: fwd
-  fwd_loss: tb
-
   epochs: 20000
 
-  exploratory: true
+  subtrainer:
+    fwd_loss: tb

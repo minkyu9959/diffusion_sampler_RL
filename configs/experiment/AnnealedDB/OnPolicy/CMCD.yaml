@@ -5,7 +5,6 @@ defaults:
   - override /train: OnPolicy
 
 train:
-  train_mode: fwd
   fwd_loss: annealed_db
 
   exploratory: false
