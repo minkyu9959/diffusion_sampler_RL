@@ -8,14 +8,15 @@ import matplotlib.pyplot as plt
 
 from omegaconf import DictConfig
 
-from models import DoubleGFN
-from models.loss import get_forward_loss, get_backward_loss
+from hydra.utils import instantiate
 
-from buffer import *
+from models import DoubleGFN
+
+from .buffer import *
 
 from energy import AnnealedDensities
 from trainer import BaseTrainer
-from metrics import compute_all_metrics, add_prefix_to_dict_key
+from logger import Logger
 
 
 from .utils.gfn_utils import get_exploration_std
@@ -31,51 +32,75 @@ def get_exploration_schedule(train_cfg, epoch: int):
 
 
 class SequentialTrainer(BaseTrainer):
+    def __init__(
+        self,
+        model: DoubleGFN,
+        energy_function: BaseEnergy,
+        train_cfg: DictConfig,
+        eval_cfg: DictConfig,
+        logger: Logger,
+    ):
+        super(SequentialTrainer, self).__init__(
+            model=model,
+            energy_function=energy_function,
+            train_cfg=train_cfg,
+            eval_cfg=eval_cfg,
+            logger=logger,
+        )
+
+        subtrainer_cfg = train_cfg.subtrainer
+        stage = train_cfg.stage
+        model_path = train_cfg.model_path
+
+        # Instantiate first and second GFN trainer
+        self.first_gfn_trainer = instantiate(
+            subtrainer_cfg.trainer,
+            model=self.model.first_gfn,
+            energy_function=self.model.intermediate_energy,
+            train_cfg=subtrainer_cfg,
+            eval_cfg=eval_cfg,
+            logger=logger,
+            _recursive_=False,
+        )
+
+        self.second_gfn_trainer = instantiate(
+            subtrainer_cfg.trainer,
+            model=self.model.second_gfn,
+            energy_function=energy_function,
+            train_cfg=subtrainer_cfg,
+            eval_cfg=eval_cfg,
+            logger=logger,
+            _recursive_=False,
+        )
+
+        if stage not in [None, 0, 1]:
+            raise ValueError("stage must be 0, 1 or None.")
+        self._stage = stage
+
+        # load pre-trained first gfn model.
+        if stage == 1:
+            if model_path is None:
+                raise ValueError("model_path must be provided if stage is 1.")
+            self.model.load_state_dict(torch.load(model_path))
+
     def initialize(self):
         self.annealed_energy: AnnealedDensities = self.model.annealed_energy
-
-        self.first_gfn_optimizer = self.model.first_gfn.get_optimizer()
-        self.second_gfn_optimizer = self.model.second_gfn.get_optimizer()
-
-        self.fwd_loss_fn = get_forward_loss(self.train_cfg.fwd_loss)
-
-        # TODO: backward loss function to be implemented.
-        # self.bwd_loss_fn = get_backward_loss(self.train_cfg.bwd_loss)
+        self.first_gfn_trainer.initialize()
+        self.second_gfn_trainer.initialize()
 
     @property
     def stage(self) -> int:
+        if self._stage is not None:
+            return self._stage
         return 0 if (self.current_epoch <= self.max_epoch // 2) else 1
 
     def train_step(self) -> float:
         self.model.zero_grad()
 
         if self.stage == 0:
-            loss = self.fwd_loss_fn(
-                self.model.first_gfn,
-                batch_size=self.train_cfg.batch_size,
-                exploration_schedule=get_exploration_schedule(
-                    self.train_cfg, self.current_epoch
-                ),
-            )
-
-            loss.backward()
-            self.first_gfn_optimizer.step()
-
+            return self.first_gfn_trainer.train_step()
         elif self.stage == 1:
-            stage1_epochs = self.current_epoch - self.max_epoch // 2
-
-            loss = self.fwd_loss_fn(
-                self.model.second_gfn,
-                batch_size=self.train_cfg.batch_size,
-                exploration_schedule=get_exploration_schedule(
-                    self.train_cfg, stage1_epochs
-                ),
-            )
-
-            loss.backward()
-            self.second_gfn_optimizer.step()
-
-        return loss.item()
+            return self.second_gfn_trainer.train_step()
 
     def eval_step(self) -> dict:
         """
@@ -84,22 +109,10 @@ class SequentialTrainer(BaseTrainer):
         Returns:
             metric: a dictionary containing metric value
         """
-
-        eval_data_size = (
-            self.eval_cfg.final_eval_data_size
-            if self.train_end
-            else self.eval_cfg.eval_data_size
-        )
-
         if self.stage == 0:
-            model = self.model.first_gfn
+            return self.first_gfn_trainer.eval_step()
         elif self.stage == 1:
-            model = self.model.second_gfn
-
-        return compute_all_metrics(
-            model=model,
-            eval_data_size=eval_data_size,
-        )
+            return self.second_gfn_trainer.eval_step()
 
     def make_plot(self):
         """
@@ -109,16 +122,18 @@ class SequentialTrainer(BaseTrainer):
         Returns:
             dict: dictionary that has figure objects as value
         """
-        plot_sample_size = self.eval_cfg.plot_sample_size
 
-        model = self.model.first_gfn if self.stage == 0 else self.model.second_gfn
+        if self.stage == 0:
+            model = self.model.first_gfn
+        elif self.stage == 1:
+            model = self.model.second_gfn
 
-        samples = model.sample(batch_size=plot_sample_size)
+        samples = model.sample(batch_size=self.eval_cfg.plot_sample_size)
 
-        fig, _ = self.plotter.make_sample_plot(samples)
-
-        fig.savefig(f"{self.output_dir}/plot.pdf", bbox_inches="tight")
+        sample_fig, _ = self.plotter.make_sample_plot(samples)
+        kde_fig, _ = self.plotter.make_kde_plot(samples)
 
         return {
-            "sample-plot": fig,
+            "sample-plot": sample_fig,
+            "kde-plot": kde_fig,
         }
