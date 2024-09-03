@@ -5,7 +5,7 @@ from torch import Tensor
 
 import numpy as np
 
-from .interface import ConditionalDensity, gaussian_params
+from .interface import ConditionalDensity
 from ..architectures import *
 
 
@@ -73,7 +73,7 @@ class ControlledMCConditional(ConditionalDensity):
         if self.clipping:
             mean_and_logvar = torch.clip(mean_and_logvar, -self.gfn_clip, self.gfn_clip)
 
-        mean, logvar = gaussian_params(mean_and_logvar)
+        mean, logvar = ConditionalDensity.split_gaussian_params(mean_and_logvar)
 
         # mask the model output and set the variance as constant.
         logvar = torch.full_like(logvar, np.log(self.base_std) * 2.0 + np.log(2))

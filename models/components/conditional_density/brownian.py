@@ -4,7 +4,7 @@ from torch import Tensor
 import numpy as np
 import math
 
-from .interface import ConditionalDensity, gaussian_params, gaussian_log_prob
+from .interface import ConditionalDensity, gaussian_log_prob
 from ..architectures import *
 
 
@@ -54,13 +54,17 @@ class BrownianConditional(ConditionalDensity):
     def sample(
         self,
         param: dict,
-        exploration_std: float = 0.0,
-        # Fixed Brownian motion, so we don't use exploration.
     ) -> Tensor:
         mean, var = param["mean"], param["var"]
-
         sample = mean + torch.randn_like(mean) * var.sqrt()
         return sample
+
+    def add_to_std_in_param_dict(
+        self,
+        additional_std: float,
+        param: dict,
+    ) -> dict:
+        raise Exception("Additional std is not supported in BrownianConditional.")
 
 
 class CorrectedBrownianConditional(BrownianConditional):
@@ -105,7 +109,7 @@ class CorrectedBrownianConditional(BrownianConditional):
         encoded_state = self.state_encoder(state)
         mean_and_var = self.joint_policy(encoded_state, encoded_time)
 
-        dmean, dvar = gaussian_params(mean_and_var)
+        dmean, dvar = ConditionalDensity.split_gaussian_params(mean_and_var)
 
         mean_correction = 1 + dmean.tanh() * self.mean_var_range
         var_correction = 1 + dvar.tanh() * self.mean_var_range

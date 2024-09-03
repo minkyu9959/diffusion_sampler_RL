@@ -5,7 +5,7 @@ from torch import Tensor
 
 import numpy as np
 
-from .interface import ConditionalDensity, gaussian_params
+from .interface import ConditionalDensity
 from ..architectures import *
 
 
@@ -106,7 +106,7 @@ class LearnedDiffusionConditional(ConditionalDensity):
         if self.clipping:
             mean_and_logvar = torch.clip(mean_and_logvar, -self.gfn_clip, self.gfn_clip)
 
-        mean, logvar = gaussian_params(mean_and_logvar)
+        mean, logvar = ConditionalDensity.split_gaussian_params(mean_and_logvar)
 
         logvar = self.transform_logvar(logvar)
 
