@@ -3,8 +3,6 @@ from typing import Callable
 import numpy as np
 import torch
 
-import matplotlib.pyplot as plt
-
 from .base_energy import HighDimensionalEnergy
 
 

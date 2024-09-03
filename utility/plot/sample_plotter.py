@@ -1,25 +1,17 @@
-"""
-Plotter class for plotting utility.
-"""
-
-from typing import Callable, Optional
+from typing import Optional
 
 import torch
-
-import numpy as np
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.animation import FuncAnimation
 
-import seaborn as sns
+from .draw_plot import *
 
-from .annealed_energy import AnnealedDensities
-from .annealed_logZ import estimate_intermediate_logZ
-from .base_energy import BaseEnergy, HighDimensionalEnergy
+from energy import BaseEnergy, HighDimensionalEnergy, AnnealedDensities
 
 
-class Plotter:
+class SamplePlotter:
     def __init__(
         self,
         energy_function: BaseEnergy,
@@ -104,29 +96,6 @@ class Plotter:
             self.alpha,
         )
 
-    def draw_vector_field(
-        self,
-        ax: Axes,
-        vecfield: Callable[[torch.Tensor], torch.Tensor],
-        device: str,
-    ):
-        """
-        Draw vector field quiver plot on 2D plot.
-        Here, given vf must be batch-support version.
-        """
-
-        X, Y = make_2D_meshgrid(self.plotting_bounds, self.grid_width_n_points // 20)
-
-        points = get_points_on_2D_grid(
-            self.plotting_bounds,
-            self.grid_width_n_points // 20,
-            device=device,
-        )
-
-        vectors = vecfield(points).detach()
-
-        return ax.quiver(X, Y, vectors[:, 0], vectors[:, 1])
-
     def draw_contour_and_ground_truth_sample(
         self,
         ax: Axes,
@@ -162,8 +131,6 @@ class Plotter:
         first_dim: Optional[int] = None,
         second_dim: Optional[int] = None,
     ):
-        trajectory_length = trajectory.size(1)
-
         fig, ax = plt.subplots(1, 1, figsize=(12, 12))
 
         self.draw_contour(ax, first_dim, second_dim)
@@ -172,31 +139,7 @@ class Plotter:
             energy: HighDimensionalEnergy = self.energy_function
             trajectory = energy.projection_on_2d(trajectory, first_dim, second_dim)
 
-        trajectory = trajectory.cpu().numpy()
-
-        # extract x, y coordinates.
-        traj_xs = trajectory[..., 0]
-        traj_ys = trajectory[..., 1]
-
-        # Plot each trajectory (maximum ten trajectory will be plotted).
-        for traj_x, traj_y, _ in zip(traj_xs, traj_ys, range(0, 10)):
-            ax.plot(traj_x, traj_y, color="black")
-
-            final_x = traj_x[-1]
-            dx = (traj_x[-1] - traj_x[-2]) / 10
-
-            final_y = traj_y[-1]
-            dy = (traj_y[-1] - traj_y[-2]) / 10
-
-            ax.arrow(
-                x=final_x,
-                y=final_y,
-                dx=dx / 10,
-                dy=dy / 10,
-                head_width=0.2,
-                edgecolor="black",
-                facecolor="black",
-            )
+        draw_sample_trajectory_plot(ax, trajectory)
 
         return fig, ax
 
@@ -287,137 +230,29 @@ class Plotter:
 
         return fig, axs
 
-    def make_time_logZ_plot(self, prior: BaseEnergy, logZ_ratio: torch.Tensor):
+    def make_time_logZ_plot(
+        self, annealed_density: AnnealedDensities, logZ_ratio: torch.Tensor
+    ):
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
 
-        draw_time_logZ_plot(ax, self.energy_function, prior)
+        logZ_t = annealed_density.logZ_t(100000, logZ_ratio.size(0))
+        draw_time_logZ_plot(ax, logZ_t)
 
-        learned_logZ = logZ_ratio.detach().cumsum(dim=0) + prior.ground_truth_logZ
-
-        ax.plot(
-            learned_logZ.cpu().numpy(),
-            linewidth=3.0,
-            label="Learned logZ_t",
+        learned_logZ_t = (
+            logZ_ratio.detach().cumsum(dim=0)
+            + annealed_density.prior_energy.ground_truth_logZ
         )
-        ax.set_xlabel("Trajectory length")
-        ax.set_ylabel("logZ_t")
+        draw_time_logZ_plot(ax, learned_logZ_t, label="Learned logZ_t")
 
         ax.legend()
 
         return fig, ax
 
+    def make_energy_histogram(self, sample: torch.Tensor, name: str = ""):
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
 
-def get_points_on_2D_grid(
-    bounds: tuple, grid_width_n_points: int, device: Optional[str] = "cpu"
-):
-    """
-    For points on the grid
-    (bounds[0], bounds[1]) x (bounds[0], bounds[1])
-    with n points at each side,
-    make the list of points on the grid whose shape are (n**2, 2).
-    """
+        log_reward = self.energy_function.log_reward(sample)
 
-    grid_lower_lim, grid_upper_lim = bounds
+        draw_energy_histogram(ax, log_reward, name)
 
-    x = torch.linspace(
-        grid_lower_lim, grid_upper_lim, grid_width_n_points, device=device
-    )
-    y = torch.linspace(
-        grid_lower_lim, grid_upper_lim, grid_width_n_points, device=device
-    )
-
-    points = torch.cartesian_prod(x, y)
-    return points
-
-
-def make_2D_meshgrid(bounds: tuple, grid_width_n_points: int):
-    """
-    For points on the grid
-    (bounds[0], bounds[1]) x (bounds[0], bounds[1])
-    with n points at each side,
-    make meshgrid tensor X, Y whose shape are (n, n).
-    """
-    grid_lower_lim, grid_upper_lim = bounds
-
-    x = torch.linspace(
-        grid_lower_lim,
-        grid_upper_lim,
-        grid_width_n_points,
-    )
-    y = torch.linspace(
-        grid_lower_lim,
-        grid_upper_lim,
-        grid_width_n_points,
-    )
-
-    return torch.meshgrid(x, y, indexing="ij")
-
-
-def draw_2D_contour(
-    ax: Axes,
-    log_prob_func: Callable[[torch.Tensor], torch.Tensor],
-    bounds: tuple,
-    device: str = "cpu",
-    grid_width_n_points: int = 200,
-    n_contour_levels: int = 50,
-    log_prob_min: float = -1000.0,
-):
-    """
-    Plot contours of a log_prob func that is defined on 2D.
-    This function returns contour object.
-
-    :Args:
-        device (str): device which log_prob_func resides on.
-    """
-
-    points = get_points_on_2D_grid(
-        bounds=bounds, grid_width_n_points=grid_width_n_points, device=device
-    )
-
-    assert points.ndim == 2 and points.shape[1] == 2
-
-    log_prob_x = log_prob_func(points).detach().cpu()
-
-    log_prob_x = torch.clamp_min(log_prob_x, log_prob_min)
-
-    log_prob_x = log_prob_x.reshape((grid_width_n_points, grid_width_n_points))
-
-    X, Y = make_2D_meshgrid(bounds=bounds, grid_width_n_points=grid_width_n_points)
-
-    return ax.contour(X, Y, log_prob_x, levels=n_contour_levels)
-
-
-def draw_2D_sample(sample: torch.Tensor, ax: Axes, bounds: tuple, alpha: float = 0.5):
-    """
-    Draw 2D sample plot.
-    This function returns scatter object.
-    """
-    plot_lower_lim, plot_upper_lim = bounds
-
-    sample = sample.cpu().detach()
-    sample = torch.clamp(sample, plot_lower_lim, plot_upper_lim)
-    return ax.scatter(sample[:, 0], sample[:, 1], alpha=alpha, marker="o", s=10)
-
-
-def draw_2D_kde(sample: torch.Tensor, ax: Axes, bounds: tuple):
-    sample = sample.cpu().detach()
-    return sns.kdeplot(
-        x=sample[:, 0], y=sample[:, 1], cmap="Blues", fill=True, ax=ax, clip=bounds
-    )
-
-
-def draw_time_logZ_plot(ax: Axes, energy: BaseEnergy, prior: BaseEnergy):
-
-    energy_name = energy.__class__.__name__.split(".")[-1]
-    prior_name = prior.__class__.__name__.split(".")[-1]
-
-    annealed_density = AnnealedDensities(energy, prior)
-    log_Z = estimate_intermediate_logZ(annealed_density, 100000, 100)
-
-    line_object = ax.plot(log_Z.cpu().numpy(), linewidth=3, label="GT logZ_t")
-
-    ax.set_title(f"{energy_name} - {prior_name} - logvar = {prior.logvar}")
-    ax.set_xlabel("Trajectory length")
-    ax.set_ylabel("logZ_t")
-
-    return line_object
+        return fig, ax

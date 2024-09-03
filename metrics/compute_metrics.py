@@ -1,7 +1,4 @@
-from typing import Callable
-
 import torch
-from energy.base_energy import BaseEnergy
 
 from .sample_based_metric import compute_all_distribution_distances
 
@@ -16,10 +13,6 @@ from .density_based_metric import (
 
 # Ground truth sample from energy function.
 GROUND_TRUTH_SAMPLE = None
-
-
-def add_prefix_to_dict_key(prefix: str, dict: dict) -> dict:
-    return {f"{prefix}{name}": dict[name] for name in dict}
 
 
 @torch.no_grad()
@@ -44,8 +37,8 @@ def compute_all_metrics(
 
     # Evaluate model
     metrics = dict()
-
     model.eval()
+
     generated_sample = model.sample(batch_size=eval_data_size)
 
     if energy_function.can_sample:

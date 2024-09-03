@@ -109,14 +109,7 @@ class AnnealedGFN(SamplerModel):
         self.logZ = torch.nn.Parameter(torch.tensor(0.0, device=self.device))
 
         if fixed_logZ_ratio:
-            from eval.util import estimate_intermediate_logZ, logZ_to_ratio
-
-            logZ_ratio = logZ_to_ratio(
-                estimate_intermediate_logZ(
-                    self.annealed_energy, 10000, trajectory_length
-                )
-            )
-
+            logZ_ratio = self.annealed_energy.logZ_ratios(10000, trajectory_length)
             self.logZ_ratio = torch.nn.Parameter(logZ_ratio, requires_grad=False)
         else:
             # log Z ratio estimator

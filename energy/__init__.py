@@ -6,9 +6,6 @@ from .gmm import GaussianMixture, GMM9, GMM25, GMM40
 from .annealed_energy import AnnealedEnergy, AnnealedDensities
 from .simple_energy import GaussianEnergy, UniformEnergy, DiracDeltaEnergy
 
-from .plotter import Plotter
-from .annealed_logZ import estimate_intermediate_logZ, load_logZ_ratio, logZ_to_ratio
-
 from hydra.utils import instantiate
 from omegaconf import DictConfig
 

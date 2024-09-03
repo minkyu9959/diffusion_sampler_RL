@@ -1,1 +1,1 @@
-from .compute_metrics import compute_all_metrics, add_prefix_to_dict_key
+from .compute_metrics import compute_all_metrics

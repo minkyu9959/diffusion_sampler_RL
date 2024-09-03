@@ -12,7 +12,7 @@ from energy import BaseEnergy, get_energy_function
 from models import get_model
 
 from trainer import BaseTrainer
-from logger import get_logger, Logger
+from utility.logger import get_logger, Logger
 
 from configs.util import *
 
@@ -49,7 +49,8 @@ def main(cfg: DictConfig) -> None:
     model: torch.nn.Module = get_model(cfg, energy_function).to(cfg.device)
 
     output_dir = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
-    logger: Logger = get_logger(cfg, output_dir)
+
+    logger: Logger = get_logger(cfg, output_dir, debug=cfg.get("detail_log", False))
 
     train(cfg, model, energy_function, logger)
 

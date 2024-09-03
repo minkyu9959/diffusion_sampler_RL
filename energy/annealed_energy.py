@@ -1,8 +1,9 @@
-import torch
+from functools import cache
 
+import torch
 import numpy as np
 
-from energy import BaseEnergy
+from .base_energy import BaseEnergy
 
 
 class AnnealedDensities:
@@ -29,9 +30,89 @@ class AnnealedDensities:
 
         return (1 - times) * prior_score + times * target_score
 
+    @cache
+    @torch.no_grad()
+    def logZ_t(self, num_samples: int, trajectory_length: int) -> torch.Tensor:
+        """
+        Estimate intermediate logZ with importance sampling.
+
+        Args:
+            intermediate_energy: AnnealedEnergy
+            num_samples: int
+                Number of samples to use for importance sampling.
+            trajectory_length: int
+                Number of step to log Z ratio estimation is performed.
+
+        Returns:
+            Tensor: Estimated intermediate logZ's.
+        """
+        target_log_Z = self.energy_function.ground_truth_logZ
+        prior_log_Z = self.prior_energy.ground_truth_logZ
+
+        sample = self._sample_from_importance_distribution(num_samples)
+        sample_energy = self._importance_distribution_energy(sample)
+
+        sample_dist_log_Z = target_log_Z + prior_log_Z + np.log(2)
+
+        times = torch.linspace(0.0, 1.0, trajectory_length + 1, device=sample.device)[
+            ..., None
+        ]
+
+        annealed_energy = self.energy(times, sample)
+
+        log_partition = (
+            torch.logsumexp(-annealed_energy + sample_energy, dim=1)
+            - torch.log(torch.tensor(num_samples))
+            + sample_dist_log_Z
+        )
+
+        return log_partition
+
+    def logZ_ratios(self, num_samples: int, trajectory_length: int) -> torch.Tensor:
+        """
+        Estimate logZ ratio for each intermediate step.
+
+        Args:
+            num_samples (int): number of samples to use for importance sampling.
+            trajectory_length (int): number of step to log Z ratio estimation is performed.
+
+        Returns:
+            Tensor: logZ ratio values.
+        """
+
+        logZ_t = self.logZ_t(num_samples, trajectory_length)
+
+        return logZ_t[1:] - logZ_t
+
+    def _sample_from_importance_distribution(self, num_samples: int) -> torch.Tensor:
+        prior_sample = self.prior_energy.sample(num_samples)
+        target_sample = self.energy_function.sample(num_samples)
+
+        mask = torch.randint(
+            0, 2, (num_samples,), device=prior_sample.device
+        ).unsqueeze(-1)
+
+        return prior_sample * mask + target_sample * (1 - mask)
+
+    def _importance_distribution_energy(self, sample: torch.Tensor) -> torch.Tensor:
+        sample_prior_energy = self.prior_energy.energy(sample)
+        sample_target_energy = self.energy_function.energy(sample)
+
+        target_log_Z = self.energy_function.ground_truth_logZ
+        prior_log_Z = self.prior_energy.ground_truth_logZ
+
+        return -torch.logsumexp(
+            torch.stack(
+                [
+                    -sample_prior_energy + target_log_Z,
+                    -sample_target_energy + prior_log_Z,
+                ],
+            ),
+            dim=0,
+        )
+
 
 class AnnealedEnergy(BaseEnergy):
-
     logZ_is_available = False
     can_sample = False
 
