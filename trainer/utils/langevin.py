@@ -87,3 +87,58 @@ def langevin_dynamics(x, log_reward, device, cfg):
             total_proposals = 0
 
     return torch.cat(accepted_samples, dim=0), torch.cat(accepted_logr, dim=0)
+
+
+@torch.enable_grad()
+def get_reward_and_gradient(x, log_reward):
+    x = x.requires_grad_(True)
+    log_r_x = log_reward(x)
+    log_r_grad = torch.autograd.grad(log_r_x.sum(), x)[0]
+
+    return log_r_x, log_r_grad
+
+
+def langevin_proposal(x, log_r_grad, step_size):
+    return (
+        x
+        + step_size * log_r_grad.detach()
+        + np.sqrt(2 * step_size) * torch.randn_like(x, device=x.device)
+    ).detach()
+
+
+def correction_step(
+    old_x, log_r_old, r_grad_old, new_x, log_r_new, r_grad_new, step_size
+):
+    device = old_x.device
+
+    log_q_fwd = -(torch.norm(-old_x - step_size * r_grad_old, p=2, dim=1) ** 2) / (
+        4 * step_size
+    )
+
+    log_q_bck = -(
+        torch.norm(old_x - new_x - step_size * r_grad_new, p=2, dim=1) ** 2
+    ) / (4 * step_size)
+
+    log_accept = (log_r_new - log_r_old) + log_q_bck - log_q_fwd
+    accept_mask = torch.rand(old_x.shape[0], device=device) < torch.exp(
+        torch.clamp(log_accept, max=0)
+    )
+
+    return accept_mask
+
+
+def one_step_langevin_dynamic(x, log_reward, step_size, do_correct=False):
+    log_r_old, r_grad_old = get_reward_and_gradient(x, log_reward)
+
+    new_x = langevin_proposal(x, r_grad_old, step_size)
+
+    if do_correct:
+        log_r_new, r_grad_new = get_reward_and_gradient(new_x, log_reward)
+        accept_mask = correction_step(
+            x, log_r_old, r_grad_old, new_x, log_r_new, r_grad_new, step_size
+        )
+        x[accept_mask] = new_x[accept_mask]
+    else:
+        x = new_x
+
+    return x.detach()
