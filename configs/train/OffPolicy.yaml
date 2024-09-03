@@ -27,3 +27,5 @@ local_search:
   ld_step: 0.1
   ld_schedule: true
   target_acceptance_rate: 0.574
+
+num_backward_train_per_forward_train: 1
