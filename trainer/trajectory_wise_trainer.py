@@ -3,6 +3,8 @@ Train code for GFN with local search buffer + Langevin parametrization
 (Sendera et al., 2024, Improved off-policy training of diffusion samplers)
 """
 
+import torch
+
 from .buffer import get_buffer
 
 from trainer import BaseTrainer
@@ -28,7 +30,7 @@ class OnPolicyTrainer(BaseTrainer):
     def initialize(self):
         self.loss_fn = get_forward_loss(self.train_cfg.fwd_loss)
 
-    def train_step(self) -> float:
+    def train_step(self) -> dict:
         self.model.zero_grad()
 
         loss = self.loss_fn(
@@ -40,8 +42,14 @@ class OnPolicyTrainer(BaseTrainer):
         )
 
         loss.backward()
+        if self.model.optimizer_cfg.get("max_grad_norm"):
+            torch.nn.utils.clip_grad_norm_(
+                self.model.parameters(), max_norm=self.model.optimizer_cfg.max_grad_norm
+            )
+
         self.optimizer.step()
-        return loss.item()
+
+        return {"loss": loss.item()}
 
 
 class OffPolicyTrainer(BaseTrainer):
@@ -62,8 +70,9 @@ class OffPolicyTrainer(BaseTrainer):
 
         train_cfg = self.train_cfg
 
-        # For even epoch, train with forward trajectory
-        if self.current_epoch % 2 == 0:
+        must_train_with_forward = self.must_train_with_forward(self.current_epoch)
+
+        if must_train_with_forward:
             loss, states, _, _, log_r = self.fwd_loss_fn(
                 self.model,
                 batch_size=train_cfg.batch_size,
@@ -82,9 +91,21 @@ class OffPolicyTrainer(BaseTrainer):
             )
 
         loss.backward()
+        if self.model.optimizer_cfg.get("max_grad_norm"):
+            torch.nn.utils.clip_grad_norm_(
+                self.model.parameters(), max_norm=self.model.optimizer_cfg.max_grad_norm
+            )
+
         self.optimizer.step()
 
-        return loss.item()
+        return {
+            (
+                "forward_loss" if must_train_with_forward else "backward_loss"
+            ): loss.item()
+        }
+
+    def must_train_with_forward(self, epoch: int) -> bool:
+        return epoch % (self.train_cfg.num_backward_train_per_forward_train + 1) == 0
 
     def sample_from_buffer(self):
         train_cfg = self.train_cfg
@@ -113,8 +134,12 @@ class OffPolicyTrainer(BaseTrainer):
 
         samples = self.sample_from_buffer()
         buffer_sample_fig, _ = self.plotter.make_sample_plot(samples)
+        buffer_energy_hist, _ = self.plotter.make_energy_histogram(
+            samples, name="buffer-sample"
+        )
 
         plot_dict["buffer-sample"] = buffer_sample_fig
+        plot_dict["buffer-energy-hist"] = buffer_energy_hist
 
         return plot_dict
 
@@ -134,9 +159,14 @@ class SampleBasedTrainer(BaseTrainer):
         loss = self.loss_fn(self.model, sample=samples)
 
         loss.backward()
+        if self.model.optimizer_cfg.get("max_grad_norm"):
+            torch.nn.utils.clip_grad_norm_(
+                self.model.parameters(), max_norm=self.model.optimizer_cfg.max_grad_norm
+            )
+
         self.optimizer.step()
 
-        return loss.item()
+        return {"loss": loss.item()}
 
 
 class TwoWayTrainer(BaseTrainer):
@@ -151,7 +181,9 @@ class TwoWayTrainer(BaseTrainer):
         train_cfg = self.train_cfg
 
         # For even epoch, train with forward trajectory
-        if self.current_epoch % 2 == 0:
+        must_train_with_forward = self.current_epoch % 2 == 0
+
+        if must_train_with_forward:
             loss = self.fwd_loss_fn(
                 self.model,
                 batch_size=train_cfg.batch_size,
@@ -172,4 +204,8 @@ class TwoWayTrainer(BaseTrainer):
         loss.backward()
         self.optimizer.step()
 
-        return loss.item()
+        return {
+            (
+                "forward_loss" if must_train_with_forward else "backward_loss"
+            ): loss.item()
+        }

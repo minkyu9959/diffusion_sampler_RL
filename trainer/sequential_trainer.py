@@ -94,7 +94,7 @@ class SequentialTrainer(BaseTrainer):
             return self._stage
         return 0 if (self.current_epoch <= self.max_epoch // 2) else 1
 
-    def train_step(self) -> float:
+    def train_step(self) -> dict:
         self.model.zero_grad()
 
         if self.stage == 0:

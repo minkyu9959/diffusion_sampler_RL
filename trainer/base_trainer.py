@@ -1,16 +1,14 @@
 import abc
 
-import torch
-
 from tqdm import trange
 
 from omegaconf import DictConfig
 
-from energy import BaseEnergy, Plotter
-from models import SamplerModel
-from logger import Logger
+from energy import BaseEnergy
+from models import SamplerModel, GFN
+from utility import Logger, SamplePlotter
 
-from metrics import compute_all_metrics, add_prefix_to_dict_key
+from metrics import compute_all_metrics
 
 
 class BaseTrainer(abc.ABC):
@@ -33,7 +31,7 @@ class BaseTrainer(abc.ABC):
     ):
         self.model = model
         self.energy_function = energy_function
-        self.plotter = Plotter(energy_function, **eval_cfg.plot)
+        self.plotter = SamplePlotter(energy_function, **eval_cfg.plot)
 
         self.train_cfg = train_cfg
         self.eval_cfg = eval_cfg
@@ -49,7 +47,7 @@ class BaseTrainer(abc.ABC):
     def initialize(self):
         pass
 
-    def train_step(self) -> float:
+    def train_step(self) -> dict:
         """
         Execute one training step and return train loss.
 
@@ -89,17 +87,21 @@ class BaseTrainer(abc.ABC):
         """
         samples = self.model.sample(batch_size=self.eval_cfg.plot_sample_size)
 
+        plot_dict = {}
+
         sample_fig, _ = self.plotter.make_sample_plot(samples)
         kde_fig, _ = self.plotter.make_kde_plot(samples)
-        logZ_fig, _ = self.plotter.make_time_logZ_plot(
-            self.model.prior_energy, self.model.logZ_ratio
-        )
 
-        return {
-            "sample-plot": sample_fig,
-            "kde-plot": kde_fig,
-            "logZ-plot": logZ_fig,
-        }
+        plot_dict["sample-plot"] = sample_fig
+        plot_dict["kde-plot"] = kde_fig
+
+        if type(self.model) is not GFN:
+            logZ_fig, _ = self.plotter.make_time_logZ_plot(
+                self.model.annealed_energy, self.model.logZ_ratio
+            )
+            plot_dict["logZ-plot"] = logZ_fig
+
+        return plot_dict
 
     def train(self):
         # Initialize some variables (e.g., optimizer, buffer, frequently used values)
@@ -111,7 +113,10 @@ class BaseTrainer(abc.ABC):
             self.current_epoch = epoch
 
             loss = self.train_step()
-            self.logger.log_loss(loss)
+            self.logger.log_loss(loss, epoch)
+
+            if self.logger.detail_log:
+                self.logger.log_gradient(self.model, epoch)
 
             if self.must_eval(epoch):
                 metrics = self.eval_step()
