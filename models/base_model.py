@@ -95,8 +95,6 @@ class SamplerModel(torch.nn.Module):
         Generate forward trajectory from given initial states.
         This function returns trajectory and its probability (both forward and backward).
 
-        kwargs is sent down to internal methods.
-
         Returns:
             trajectories:
             torch.tensor with shape (batch_size, trajectory_length + 1, sample_dim)
@@ -123,11 +121,12 @@ class SamplerModel(torch.nn.Module):
             exploration_std = (
                 exploration_schedule(cur_time) if exploration_schedule else 0.0
             )
-
-            # Sample x_{t+1} ~ p_F(-| x_t) using parameters.
-            next_state = self.forward_conditional.sample(
-                pf_params, exploration_std=exploration_std
+            pf_params_for_sample = ConditionalDensity.add_to_std_in_param_dict(
+                exploration_std, pf_params
             )
+
+            # Sample x_{t+1} ~ p_F(-| x_t).
+            next_state = self.forward_conditional.sample(pf_params_for_sample)
             if not self.backprop_through_state:
                 next_state = next_state.detach()
 
@@ -179,14 +178,9 @@ class SamplerModel(torch.nn.Module):
             # Get parameters of p_B(-| x_t).
             pb_params = self.backward_conditional.params(cur_state, cur_time)
 
-            exploration_std = (
-                exploration_schedule(cur_time) if exploration_schedule else 0.0
-            )
+            # Sample x_{t-1} ~ p_B(-| x_t).
+            prev_state = self.backward_conditional.sample(pb_params)
 
-            # Sample x_{t-1} ~ p_B(-| x_t) using parameters.
-            prev_state = self.backward_conditional.sample(
-                pb_params, exploration_std=exploration_std
-            )
             if not self.backprop_through_state:
                 prev_state = prev_state.detach()
 
