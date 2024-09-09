@@ -4,4 +4,4 @@ dim: ${energy.dim}
 
 device: ${device}
 
-std: 1.0
+std: 7.0
