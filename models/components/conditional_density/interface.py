@@ -39,6 +39,15 @@ class ConditionalDensity(abc.ABC):
         sample = mean + (logvar / 2).exp() * torch.randn_like(mean)
         return sample
 
+    def sample_with_given_noise(
+        self,
+        param: dict,
+        noise: Tensor,
+    ) -> Tensor:
+        mean, logvar = param["mean"], param["logvar"]
+        sample = mean + (logvar / 2).exp() * noise
+        return sample
+
     @staticmethod
     def add_to_std_in_param_dict(
         additional_std: float,

@@ -133,6 +133,7 @@ class JointPolicy(nn.Module):
         s_emb_dim: int,
         t_dim: int,
         hidden_dim: int = 64,
+        num_layers: int = 2,
         zero_init: bool = False,
     ):
         super(JointPolicy, self).__init__()
@@ -140,8 +141,13 @@ class JointPolicy(nn.Module):
         self.model = nn.Sequential(
             nn.Linear(s_emb_dim + t_dim, hidden_dim),
             nn.GELU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.GELU(),
+            *[
+                nn.Sequential(
+                    nn.Linear(hidden_dim, hidden_dim),
+                    nn.GELU(),
+                )
+                for _ in range(num_layers - 1)
+            ],
             nn.Linear(hidden_dim, 2 * s_dim),
         )
 
@@ -252,9 +258,10 @@ class JointPolicyPIS(nn.Module):
 
         self.model = nn.Sequential(
             nn.GELU(),
+            nn.Sequential(nn.Linear(s_emb_dim, hidden_dim), nn.GELU()),
             *[
                 nn.Sequential(nn.Linear(hidden_dim, hidden_dim), nn.GELU())
-                for _ in range(num_layers)
+                for _ in range(num_layers - 1)
             ],
             nn.Linear(hidden_dim, 2 * s_dim),
         )
@@ -285,9 +292,10 @@ class FlowModelPIS(nn.Module):
 
         self.model = nn.Sequential(
             nn.GELU(),
+            nn.Sequential(nn.Linear(s_emb_dim, hidden_dim), nn.GELU()),
             *[
                 nn.Sequential(nn.Linear(hidden_dim, hidden_dim), nn.GELU())
-                for _ in range(num_layers)
+                for _ in range(num_layers - 1)
             ],
             nn.Linear(hidden_dim, out_dim),
         )

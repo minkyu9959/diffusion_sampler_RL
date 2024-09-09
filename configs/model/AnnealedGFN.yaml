@@ -1,32 +1,50 @@
 _target_: models.AnnealedGFN
 
 defaults:
-  - components@state_encoder: StateEncoding-PIS
+  - components@state_encoder: StateEncoding
 
-  - components@time_encoder: TimeEncoding-PIS
+  - components@time_encoder: TimeEncoding
 
   - components@flow_model: FlowModel-PIS
 
-  - components@forward_policy: JointPolicy-PIS
+  - components@forward_policy: JointPolicy
 
-  - components@backward_policy: JointPolicy-PIS
+  - components@backward_policy: JointPolicy
 
-  - components@langevin_scaler: LangevinScaling-PIS
+  - components@langevin_scaler: LangevinScaling
 
   - prior_energy: Gaussian
 
+  - optional override prior_energy: Gaussian-${energy}
+
 state_encoder:
   s_dim: ${energy.dim}
+  s_emb_dim: 64
+
+time_encoder:
+  t_emb_dim: 64
+  harmonics_dim: ${.t_emb_dim}
 
 trajectory_length: 100
 
 forward_policy:
   s_dim: ${energy.dim}
+  s_emb_dim: ${model.state_encoder.s_emb_dim}
+  t_dim: ${model.time_encoder.t_emb_dim}
+  hidden_dim: 64
+  num_layers: 2
 
 backward_policy:
   s_dim: ${energy.dim}
+  s_emb_dim: ${model.state_encoder.s_emb_dim}
+  t_dim: ${model.time_encoder.t_emb_dim}
+  hidden_dim: ${model.forward_policy.hidden_dim}
+  num_layers: ${model.forward_policy.num_layers}
 
 langevin_scaler:
+  s_emb_dim: ${model.state_encoder.s_emb_dim}
+  t_dim: ${model.time_encoder.t_emb_dim}
+  hidden_dim: ${model.forward_policy.hidden_dim}
   _partial_: true
   out_dim: 1
 

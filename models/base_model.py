@@ -111,6 +111,9 @@ class SamplerModel(torch.nn.Module):
 
         # Create empty (zero) tensor with corresponding size.
         logpf, logpb, trajectories = self._allocate_memory(batch_size)
+        noise = torch.randn(
+            self.trajectory_length, *initial_states.size(), device=self.device
+        )
 
         trajectories[:, 0] = cur_state = initial_states
 
@@ -118,15 +121,18 @@ class SamplerModel(torch.nn.Module):
             # Get parameters of p_F(-| x_t).
             pf_params = self.forward_conditional.params(cur_state, cur_time)
 
-            exploration_std = (
-                exploration_schedule(cur_time) if exploration_schedule else 0.0
-            )
-            pf_params_for_sample = ConditionalDensity.add_to_std_in_param_dict(
-                exploration_std, pf_params
-            )
+            if exploration_schedule is not None:
+                exploration_std = exploration_schedule(cur_time)
+                pf_params_for_sample = ConditionalDensity.add_to_std_in_param_dict(
+                    exploration_std, pf_params
+                )
+            else:
+                pf_params_for_sample = pf_params
 
             # Sample x_{t+1} ~ p_F(-| x_t).
-            next_state = self.forward_conditional.sample(pf_params_for_sample)
+            next_state = self.forward_conditional.sample_with_given_noise(
+                pf_params_for_sample, noise[cur_idx]
+            )
             if not self.backprop_through_state:
                 next_state = next_state.detach()
 

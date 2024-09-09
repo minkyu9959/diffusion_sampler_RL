@@ -10,7 +10,10 @@ from energy import BaseEnergy, AnnealedDensities, DiracDeltaEnergy
 from .base_model import SamplerModel
 
 from .components.architectures import *
-from .components.conditional_density import LearnedDiffusionConditional
+from .components.conditional_density import (
+    LearnedAnnealedDiffusionConditional,
+    LearnedDiffusionConditional,
+)
 
 
 class AnnealedGFN(SamplerModel):
@@ -70,14 +73,14 @@ class AnnealedGFN(SamplerModel):
             self.forward_langevin_scaler = None
             self.backward_langevin_scaler = None
 
-        self.forward_conditional = LearnedDiffusionConditional(
+        self.forward_conditional = LearnedAnnealedDiffusionConditional(
             sample_dim=self.sample_dim,
             dt=self.dt,
             state_encoder=state_encoder,
             time_encoder=time_encoder,
             joint_policy=self.forward_policy,
             langevin_scaler=self.forward_langevin_scaler,
-            score_fn=self.energy_function.score,
+            score_fn=self.annealed_energy.score,
             clipping=clipping,
             lgv_clip=lgv_clip,
             gfn_clip=gfn_clip,
@@ -86,14 +89,14 @@ class AnnealedGFN(SamplerModel):
             base_std=base_std,
         )
 
-        self.backward_conditional = LearnedDiffusionConditional(
+        self.backward_conditional = LearnedAnnealedDiffusionConditional(
             sample_dim=self.sample_dim,
             dt=self.dt,
             state_encoder=state_encoder,
             time_encoder=time_encoder,
             joint_policy=self.backward_policy,
             langevin_scaler=self.backward_langevin_scaler,
-            score_fn=self.energy_function.score,
+            score_fn=self.annealed_energy.score,
             clipping=clipping,
             lgv_clip=lgv_clip,
             gfn_clip=gfn_clip,
