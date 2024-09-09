@@ -16,6 +16,13 @@ class AnnealedDensities:
         self.device = energy_function.device
         self.prior_energy = prior_energy
 
+        self.logZ_t_is_available = (
+            self.prior_energy.logZ_is_available
+            and self.energy_function.logZ_is_available
+            and self.prior_energy.can_sample
+            and self.energy_function.can_sample
+        )
+
     def energy(self, times: torch.Tensor, states: torch.Tensor):
 
         prior_energy = self.prior_energy.energy(states)
@@ -37,7 +44,6 @@ class AnnealedDensities:
         Estimate intermediate logZ with importance sampling.
 
         Args:
-            intermediate_energy: AnnealedEnergy
             num_samples: int
                 Number of samples to use for importance sampling.
             trajectory_length: int
