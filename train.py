@@ -1,7 +1,4 @@
-import random
-
 import torch
-import numpy as np
 
 import hydra
 from hydra.utils import instantiate
@@ -12,7 +9,7 @@ from energy import BaseEnergy, get_energy_function
 from models import get_model
 
 from trainer import BaseTrainer
-from utility.logger import get_logger, Logger
+from utility import get_logger, Logger, set_seed
 
 from configs.util import *
 
@@ -44,7 +41,7 @@ def main(cfg: DictConfig) -> None:
 
     set_seed(cfg.seed)
 
-    energy_function: BaseEnergy = get_energy_function(cfg)
+    energy_function: BaseEnergy = get_energy_function(cfg.energy, device=cfg.device)
 
     model: torch.nn.Module = get_model(cfg, energy_function).to(cfg.device)
 
@@ -53,16 +50,6 @@ def main(cfg: DictConfig) -> None:
     logger: Logger = get_logger(cfg, output_dir, debug=cfg.get("detail_log", False))
 
     train(cfg, model, energy_function, logger)
-
-
-def set_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    random.seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(seed)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 import neptune
 
 import sys
+from typing import Union
 
 import matplotlib.pyplot as plt
 import torch
@@ -11,7 +12,9 @@ from configs.util import *
 
 
 class NeptuneLogger(Logger):
-    def __init__(self, cfg: dict, output_dir: str, debug: bool = False):
+    def __init__(
+        self, cfg: Union[dict, DictConfig], output_dir: str, debug: bool = False
+    ):
 
         # require more detailed log for debugging purpose
         self.detail_log = debug
@@ -28,7 +31,10 @@ class NeptuneLogger(Logger):
 
         # neptune logger cannot accept OmegaConf object.
         # Convert it to python dictionary.
-        cfg_dict = OmegaConf.to_container(cfg)
+        if type(cfg) is DictConfig:
+            cfg_dict = OmegaConf.to_container(cfg, resolve=True)
+        else:
+            cfg_dict = cfg
 
         # Remove already logged values.
         cfg_dict.pop("name", None)

@@ -231,28 +231,45 @@ class SamplePlotter:
         return fig, axs
 
     def make_time_logZ_plot(
-        self, annealed_density: AnnealedDensities, logZ_ratio: torch.Tensor
+        self,
+        annealed_density: AnnealedDensities,
+        logZ_ratio: torch.Tensor,
+        label: str = "Learned logZ_t",
     ):
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
 
         logZ_t = annealed_density.logZ_t(100000, logZ_ratio.size(0))
-        draw_time_logZ_plot(ax, logZ_t)
+        draw_time_logZ_plot(ax, logZ_t, label="Exact")
 
         learned_logZ_t = (
             logZ_ratio.detach().cumsum(dim=0)
             + annealed_density.prior_energy.ground_truth_logZ
         )
-        draw_time_logZ_plot(ax, learned_logZ_t, label="Learned logZ_t")
+        draw_time_logZ_plot(ax, learned_logZ_t, label=label)
 
         ax.legend()
 
         return fig, ax
 
+    def draw_time_logZ_plot(
+        ax: Axes, logZ_t: torch.Tensor, label: str = "Ground truth logZ_t"
+    ):
+        return draw_time_logZ_plot(ax, logZ_t, label)
+
     def make_energy_histogram(self, sample: torch.Tensor, name: str = ""):
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+        self.draw_energy_histogram(ax, sample, name)
+        return fig, ax
 
+    def draw_energy_histogram(self, ax: Axes, sample: torch.Tensor, name: str = ""):
         log_reward = self.energy_function.log_reward(sample)
-
         draw_energy_histogram(ax, log_reward, name)
 
-        return fig, ax
+    def draw_vector_field(self, ax: Axes):
+        return draw_vector_field(
+            ax,
+            vecfield=self.energy_function.score,
+            device=self.energy_function.device,
+            plotting_bounds=self.plotting_bounds,
+            grid_width_n_points=self.grid_width_n_points,
+        )

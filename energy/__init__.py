@@ -10,7 +10,7 @@ from hydra.utils import instantiate
 from omegaconf import DictConfig
 
 
-def get_energy_function(cfg: DictConfig) -> BaseEnergy:
-    energy_function = instantiate(cfg.energy, device=cfg.device)
+def get_energy_function(cfg: DictConfig, device: str) -> BaseEnergy:
+    energy_function = instantiate(cfg, device=device)
 
     return energy_function

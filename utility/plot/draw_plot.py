@@ -107,7 +107,13 @@ def draw_2D_sample(sample: torch.Tensor, ax: Axes, bounds: tuple, alpha: float =
 def draw_2D_kde(sample: torch.Tensor, ax: Axes, bounds: tuple):
     sample = sample.cpu().detach()
     return sns.kdeplot(
-        x=sample[:, 0], y=sample[:, 1], cmap="Blues", fill=True, ax=ax, clip=bounds
+        x=sample[:, 0],
+        y=sample[:, 1],
+        cmap="Blues",
+        fill=True,
+        ax=ax,
+        clip=bounds,
+        warn_singular=False,
     )
 
 
@@ -125,6 +131,8 @@ def draw_time_logZ_plot(
 def draw_energy_histogram(
     ax: Axes, log_reward: torch.Tensor, name=None, bins=40, range=(90, 160)
 ):
+    log_reward = torch.clamp(log_reward, min=range[0], max=range[1])
+
     hist, bins = np.histogram(
         log_reward.detach().cpu().numpy(), bins=bins, range=range, density=True
     )
