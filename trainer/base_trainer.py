@@ -1,5 +1,7 @@
 import abc
 
+import torch
+
 from tqdm import trange
 
 from omegaconf import DictConfig
@@ -56,6 +58,7 @@ class BaseTrainer(abc.ABC):
         """
         raise NotImplementedError("train_step method must be implemented.")
 
+    @torch.no_grad()
     def eval_step(self) -> dict:
         """
         Execute evaluation step and return metric dictionary.
@@ -77,6 +80,7 @@ class BaseTrainer(abc.ABC):
             # At the end of training, we resample the evaluation data.
         )
 
+    @torch.no_grad()
     def make_plot(self):
         """
         Generate sample from model and plot it using plotter.
@@ -85,15 +89,18 @@ class BaseTrainer(abc.ABC):
         Returns:
             dict: dictionary that has figure objects as value
         """
-        samples = self.model.sample(batch_size=self.eval_cfg.plot_sample_size)
+        sample = self.model.sample(batch_size=self.eval_cfg.plot_sample_size)
 
         plot_dict = {}
 
-        sample_fig, _ = self.plotter.make_sample_plot(samples)
-        kde_fig, _ = self.plotter.make_kde_plot(samples)
-
+        sample_fig, _ = self.plotter.make_sample_plot(sample)
         plot_dict["sample-plot"] = sample_fig
+
+        kde_fig, _ = self.plotter.make_kde_plot(sample)
         plot_dict["kde-plot"] = kde_fig
+
+        energy_hist_fig, _ = self.plotter.make_energy_histogram(sample, name="Model")
+        plot_dict["sample-energy-hist"] = energy_hist_fig
 
         if type(self.model) is not GFN:
             logZ_fig, _ = self.plotter.make_time_logZ_plot(

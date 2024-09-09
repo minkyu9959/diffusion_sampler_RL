@@ -16,7 +16,7 @@ from .buffer import *
 
 from energy import AnnealedDensities
 from trainer import BaseTrainer
-from logger import Logger
+from utility import Logger
 
 
 from .utils.gfn_utils import get_exploration_std
