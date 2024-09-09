@@ -16,6 +16,10 @@ energy:
 name: ???
 
 hydra:
+  run:
+    dir: results/outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep: 
+    dir: results/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
   help:
     app_name: "Sampler model profiler"
 
