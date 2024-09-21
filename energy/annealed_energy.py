@@ -88,7 +88,7 @@ class AnnealedDensities:
 
         logZ_t = self.logZ_t(num_samples, trajectory_length)
 
-        return logZ_t[1:] - logZ_t
+        return logZ_t[1:] - logZ_t[:-1]
 
     def _sample_from_importance_distribution(self, num_samples: int) -> torch.Tensor:
         prior_sample = self.prior_energy.sample(num_samples)
