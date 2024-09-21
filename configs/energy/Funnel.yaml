@@ -1,11 +1,5 @@
 # @package _global_
 
 energy:
-  _target_: energy.funnel.Funnel
+  name: "Funnel"
   dim: 10
-
-eval:
-  plot:
-    plotting_bounds: [-10.0, 10.0]
-    projection_dims: [[0, 1], [1, 2]]
-    fig_size: [12, 6]

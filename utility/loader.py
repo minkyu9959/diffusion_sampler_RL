@@ -13,7 +13,7 @@ from .seed import set_seed
 from models import get_model
 from trainer import BaseTrainer
 
-from energy import get_energy_function
+from energy import get_energy_function, get_energy_by_name
 
 
 CONFIG_PATH = "/home/guest_dyw/diffusion-sampler/configs"
@@ -21,13 +21,10 @@ CONFIG_PATH = "/home/guest_dyw/diffusion-sampler/configs"
 
 def load_energy_and_plotter(name: str, device: str = "cpu"):
     """Load energy function and plotter."""
-    cfg = OmegaConf.load(f"{CONFIG_PATH}/energy/{name}.yaml")
+    energy = get_energy_by_name(name, device=device)
+    plotter = SamplePlotter(energy)
 
-    energy_function = get_energy_function(cfg.energy, device=device)
-
-    plotter = SamplePlotter(energy_function, **cfg.eval.plot)
-
-    return energy_function, plotter
+    return energy, plotter
 
 
 def load_energy_model_and_config(
@@ -51,14 +48,15 @@ def load_energy_model_and_config(
 
     set_seed(cfg.seed)
 
-    energy = get_energy_function(cfg.energy, device=cfg.device)
-
+    energy = get_energy_by_name(energy_name, device=cfg.device)
     model = get_model(cfg, energy).to(cfg.device)
 
     return energy, model, cfg
 
 
-def load_all_from_experiment_path(experiment_path: str, must_init_logger=False):
+def load_all_from_experiment_path(
+    experiment_path: str, must_init_logger=False, name="ManyWell"
+):
     config_path = experiment_path + "/.hydra/config.yaml"
 
     cfg = OmegaConf.load(config_path)
@@ -66,6 +64,7 @@ def load_all_from_experiment_path(experiment_path: str, must_init_logger=False):
     set_seed(cfg.seed)
 
     energy = get_energy_function(cfg.energy, device=cfg.device)
+    energy.name = name
 
     model = get_model(cfg, energy).to(cfg.device)
 

@@ -5,7 +5,7 @@ from hydra.utils import instantiate
 
 from omegaconf import DictConfig
 
-from energy import BaseEnergy, get_energy_function
+from energy import BaseEnergy, get_energy_by_name
 from models import get_model
 
 from trainer import BaseTrainer
@@ -41,7 +41,7 @@ def main(cfg: DictConfig) -> None:
 
     set_seed(cfg.seed)
 
-    energy_function: BaseEnergy = get_energy_function(cfg.energy, device=cfg.device)
+    energy_function: BaseEnergy = get_energy_by_name(cfg.energy.name, device=cfg.device)
 
     model: torch.nn.Module = get_model(cfg, energy_function).to(cfg.device)
 

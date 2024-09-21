@@ -33,7 +33,7 @@ class BaseTrainer(abc.ABC):
     ):
         self.model = model
         self.energy_function = energy_function
-        self.plotter = SamplePlotter(energy_function, **eval_cfg.plot)
+        self.plotter = SamplePlotter(energy_function, **eval_cfg.get("plot", {}))
 
         self.train_cfg = train_cfg
         self.eval_cfg = eval_cfg
@@ -93,14 +93,19 @@ class BaseTrainer(abc.ABC):
 
         plot_dict = {}
 
-        sample_fig, _ = self.plotter.make_sample_plot(sample)
-        plot_dict["sample-plot"] = sample_fig
+        if self.plotter.can_draw_sample_plot:
+            sample_fig, _ = self.plotter.make_sample_plot(sample)
+            plot_dict["sample-plot"] = sample_fig
 
-        kde_fig, _ = self.plotter.make_kde_plot(sample)
-        plot_dict["kde-plot"] = kde_fig
+        if self.plotter.can_draw_kde_plot:
+            kde_fig, _ = self.plotter.make_kde_plot(sample)
+            plot_dict["kde-plot"] = kde_fig
 
-        energy_hist_fig, _ = self.plotter.make_energy_histogram(sample, name="Model")
-        plot_dict["sample-energy-hist"] = energy_hist_fig
+        if self.plotter.can_draw_energy_hist:
+            energy_hist_fig, _ = self.plotter.make_energy_histogram(
+                sample, name="Model"
+            )
+            plot_dict["sample-energy-hist"] = energy_hist_fig
 
         if type(self.model) is not GFN:
             logZ_fig, _ = self.plotter.make_time_logZ_plot(

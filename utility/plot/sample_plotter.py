@@ -7,6 +7,7 @@ from matplotlib.axes import Axes
 from matplotlib.animation import FuncAnimation
 
 from .draw_plot import *
+from .plot_config import PLOT_CONFIG
 
 from energy import BaseEnergy, HighDimensionalEnergy, AnnealedDensities
 
@@ -15,23 +16,31 @@ class SamplePlotter:
     def __init__(
         self,
         energy_function: BaseEnergy,
-        plotting_bounds=(-10.0, 10.0),
-        projection_dims: Optional[list[tuple[int, int]]] = None,
-        fig_size: Optional[tuple[float, float]] = (12.0, 6.0),
         **kwargs,
     ):
         self.energy_function = energy_function
-        self.need_projection = isinstance(energy_function, HighDimensionalEnergy)
 
-        if self.need_projection and projection_dims is None:
+        self.plot_cfg: dict = PLOT_CONFIG[energy_function.name]
+        self.plot_cfg.update(kwargs)
+
+        self.can_draw_sample_plot = self.plot_cfg.get("sample-plot", False)
+        self.can_draw_kde_plot = self.plot_cfg.get("kde-plot", False)
+        self.can_draw_energy_hist = self.plot_cfg.get("energy-hist", False)
+
+        self.need_projection = isinstance(energy_function, HighDimensionalEnergy)
+        self.projection_dims = self.plot_cfg.get("projection_dims", None)
+
+        if (
+            self.need_projection
+            and self.can_draw_sample_plot
+            and self.projection_dims is None
+        ):
             raise Exception("Please provide projection_dims for HighDimensionalEnergy")
 
-        self.projection_dims = projection_dims
-
         # Figure settings
-        self.fig_size = fig_size
-
-        self.plotting_bounds = plotting_bounds
+        self.fig_size = self.plot_cfg.get("fig_size", (12.0, 6.0))
+        self.energy_range = self.plot_cfg.get("energy_range", (90, 160))
+        self.plotting_bounds = self.plot_cfg.get("plotting_bounds", (-10.0, 10.0))
 
         self.grid_width_n_points = 200
         self.n_contour_levels = 50
@@ -263,7 +272,7 @@ class SamplePlotter:
 
     def draw_energy_histogram(self, ax: Axes, sample: torch.Tensor, name: str = ""):
         log_reward = self.energy_function.log_reward(sample)
-        draw_energy_histogram(ax, log_reward, name)
+        draw_energy_histogram(ax, log_reward, name, range=self.energy_range)
 
     def draw_vector_field(self, ax: Axes):
         return draw_vector_field(

@@ -1,14 +1,5 @@
 # @package _global_
 
 energy:
-  _target_: energy.gmm.GMM25
+  name: "GMM25"
   dim: 2
-
-eval:
-  plot:
-    plotting_bounds: [-20.0, 20.0]
-    fig_size: [12, 12]
-
-  eval_data_size: 10000
-  final_eval_data_size: 10000
-  plot_sample_size: 10000

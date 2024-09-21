@@ -1,10 +1,5 @@
 # @package _global_
 
 energy:
-  _target_: energy.gmm.GMM40
+  name: "GMM40"
   dim: 2
-
-eval:
-  plot:
-    plotting_bounds: [-50.0, 50.0]
-    fig_size: [12, 7]

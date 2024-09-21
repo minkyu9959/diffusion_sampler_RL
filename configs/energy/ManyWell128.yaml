@@ -1,0 +1,5 @@
+# @package _global_
+
+energy:
+  name: "ManyWell128"
+  dim: 128

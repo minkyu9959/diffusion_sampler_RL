@@ -17,7 +17,7 @@ def get_model_name_from_config(cfg: DictConfig) -> str:
 
 
 def get_energy_name_from_config(cfg: DictConfig) -> str:
-    return cfg.energy._target_.split(".")[-1]
+    return cfg.energy.name
 
 
 def make_tag(cfg: DictConfig):
