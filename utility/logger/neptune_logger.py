@@ -1,6 +1,8 @@
 import neptune
+from neptune.utils import stringify_unsupported
 
 import sys
+import math
 from typing import Union
 
 import matplotlib.pyplot as plt
@@ -40,7 +42,11 @@ class NeptuneLogger(Logger):
         cfg_dict.pop("name", None)
         cfg_dict.pop("group_tag", None)
 
+        plot_cfg = cfg_dict["eval"].get("plot", None)
+        cfg_dict["eval"].pop("plot", None)
+
         self.run["parameters"] = cfg_dict
+        self.run["parameters/eval/plot"] = stringify_unsupported(plot_cfg)
 
         self.run["scripts"] = "python3 " + " ".join(sys.argv)
         self.run["output_dir"] = output_dir
@@ -56,6 +62,8 @@ class NeptuneLogger(Logger):
 
     def log_metric(self, metrics: dict, epoch: int):
         for metric_name, metric_value in metrics.items():
+            if math.isinf(metric_value) or math.isnan(metric_value):
+                metric_value = 0.0
             self.run[f"eval/{metric_name}"].append(value=metric_value, step=epoch)
 
     def log_visual(self, visuals: dict, epoch: int):
