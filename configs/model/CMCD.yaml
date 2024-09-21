@@ -1,19 +1,28 @@
 _target_: models.CMCDSampler
 
 defaults:
-  - components@state_encoder: StateEncoding-PIS
+  - components@state_encoder: StateEncoding
 
-  - components@time_encoder: TimeEncoding-PIS
+  - components@time_encoder: TimeEncoding
 
-  - components@control_model: JointPolicy-PIS
+  - components@control_model: JointPolicy
 
   - prior_energy: Gaussian
 
-control_model:
-  s_dim: ${energy.dim}
-
 state_encoder:
   s_dim: ${energy.dim}
+  s_emb_dim: 128
+
+time_encoder:
+  t_emb_dim: 128
+  harmonics_dim: ${.t_emb_dim}
+
+control_model:
+  s_dim: ${energy.dim}
+  s_emb_dim: ${model.state_encoder.s_emb_dim}
+  t_dim: ${model.time_encoder.t_emb_dim}
+  hidden_dim: 256
+  num_layers: 2
 
 trajectory_length: 100
 

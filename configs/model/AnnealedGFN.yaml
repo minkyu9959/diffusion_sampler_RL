@@ -19,19 +19,19 @@ defaults:
 
 state_encoder:
   s_dim: ${energy.dim}
-  s_emb_dim: 64
+  s_emb_dim: 128
 
 time_encoder:
-  t_emb_dim: 64
-  harmonics_dim: ${.t_emb_dim}
+  t_emb_dim: 128
 
 trajectory_length: 100
+annealing_step: ${.trajectory_length}
 
 forward_policy:
   s_dim: ${energy.dim}
   s_emb_dim: ${model.state_encoder.s_emb_dim}
   t_dim: ${model.time_encoder.t_emb_dim}
-  hidden_dim: 64
+  hidden_dim: 256
   num_layers: 2
 
 backward_policy:

@@ -17,16 +17,28 @@ defaults:
 
 forward_model:
   s_dim: ${energy.dim}
+  s_emb_dim: ${model.state_encoder.s_emb_dim}
+  t_dim: ${model.time_encoder.t_emb_dim}
+  hidden_dim: 256
+  num_layers: 2
 
 backward_model:
   s_dim: ${energy.dim}
 
 state_encoder:
   s_dim: ${energy.dim}
+  s_emb_dim: 128
+
+time_encoder:
+  t_emb_dim: 128
+  harmonics_dim: ${.t_emb_dim}
 
 # If yout want to scale gradient of energy dimension-wise,
 # you can set out_dim to ${energy.dim}.
 langevin_scaler:
+  s_emb_dim: ${model.state_encoder.s_emb_dim}
+  t_dim: ${model.time_encoder.t_emb_dim}
+  hidden_dim: ${model.forward_model.hidden_dim}
   out_dim: ${energy.dim}
 
 trajectory_length: 100

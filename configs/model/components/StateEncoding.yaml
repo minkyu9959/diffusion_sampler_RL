@@ -3,6 +3,6 @@ _target_: models.components.architectures.StateEncoding
 s_dim: ???
 # s_dim, sample space dimension is set in runtime.
 
-hidden_dim: 64
+hidden_dim: ${.s_emb_dim}
 
 s_emb_dim: 64

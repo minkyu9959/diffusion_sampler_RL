@@ -33,6 +33,7 @@ class AnnealedGFN(SamplerModel):
         time_encoder: nn.Module,
         forward_policy: nn.Module,
         backward_policy: nn.Module,
+        annealing_step: int = 100,
         langevin_scaler: Any = None,  # partial instance of langevin scaler
         clipping: bool = False,
         lgv_clip: float = 1e2,
@@ -58,6 +59,7 @@ class AnnealedGFN(SamplerModel):
         self.annealed_energy = AnnealedDensities(
             energy_function=energy_function, prior_energy=prior_energy
         )
+        self.annealing_step = annealing_step
 
         self.state_encoder = state_encoder
         self.time_encoder = time_encoder
@@ -112,12 +114,12 @@ class AnnealedGFN(SamplerModel):
         self.logZ = torch.nn.Parameter(torch.tensor(0.0, device=self.device))
 
         if fixed_logZ_ratio:
-            logZ_ratio = self.annealed_energy.logZ_ratios(10000, trajectory_length)
+            logZ_ratio = self.annealed_energy.logZ_ratios(10000, annealing_step)
             self.logZ_ratio = torch.nn.Parameter(logZ_ratio, requires_grad=False)
         else:
             # log Z ratio estimator
             self.logZ_ratio = torch.nn.Parameter(
-                torch.zeros(trajectory_length, device=device)
+                torch.zeros(annealing_step, device=device)
             )
 
     def get_flow_from_trajectory(self, trajectory: torch.Tensor) -> torch.Tensor:
