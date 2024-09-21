@@ -36,3 +36,24 @@ class SampleRewardStorage(torch.utils.data.Dataset):
     def collate(batched_sample_and_rewards: list[tuple[torch.Tensor, torch.Tensor]]):
         raise NotImplementedError
         # return torch.stack(data_list)
+
+
+class TransitionStorage(torch.utils.data.Dataset):
+    def __init__(self, states: torch.Tensor, time: torch.Tensor):
+        super().__init__()
+        self.states = states.detach()
+        self.time = time.detach()
+
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
+        return self.states[idx], self.time[idx]
+
+    def update(self, states: torch.Tensor, time: torch.Tensor):
+        self.states = torch.cat([self.states, states], dim=0)
+        self.time = torch.cat([self.time, time], dim=0)
+
+    def deque(self, num_elem_to_delete: int):
+        self.states = self.states[num_elem_to_delete:]
+        self.time = self.time[num_elem_to_delete:]
+
+    def __len__(self):
+        return self.states.size(0)

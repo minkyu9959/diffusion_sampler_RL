@@ -2,6 +2,7 @@ from .prioritized_buffer import (
     RankPrioritizedReplayBuffer,
     RewardPrioritizedReplayBuffer,
 )
+from .state_transition_buffer import StateTransitionReplayBuffer
 from .simple_buffer import SimpleReplayBuffer
 from .base_buffer import BaseBuffer
 

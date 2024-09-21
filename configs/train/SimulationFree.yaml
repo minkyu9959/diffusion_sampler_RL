@@ -1,0 +1,12 @@
+trainer:
+  _target_: trainer.simulation_free_trainer.SimulationFreeTrainer
+
+epochs: 25000
+
+batch_size: 30000
+buffer_size: 300000
+
+sample_interval: 10
+simulation_sample_size: 300
+
+backward_simulation: false
