@@ -46,7 +46,11 @@ langevin_scaler:
   t_dim: ${model.time_encoder.t_emb_dim}
   hidden_dim: ${model.forward_policy.hidden_dim}
   _partial_: true
-  out_dim: 1
+  out_dim: ${energy.dim}
+
+annealing_schedule:
+  _target_: models.components.architectures.AnnealingSchedule
+  annealing_step: ${model.annealing_step}
 
 clipping: true
 lgv_clip: 1e2

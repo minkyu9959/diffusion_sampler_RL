@@ -42,6 +42,7 @@ class AnnealedGFN(SamplerModel):
         log_var_range: float = 4.0,
         base_std: float = 1.0,
         flow_model: Optional[torch.nn.Module] = None,
+        annealing_schedule: Optional[torch.nn.Module] = None,
         device=torch.device("cuda"),
         fixed_logZ_ratio: bool = False,
     ):
@@ -122,6 +123,8 @@ class AnnealedGFN(SamplerModel):
                 torch.zeros(annealing_step, device=device)
             )
 
+        self.annealing_schedule = annealing_schedule
+
     def get_flow_from_trajectory(self, trajectory: torch.Tensor) -> torch.Tensor:
         if self.conditional_flow_model is None:
             raise Exception("Flow model is not defined.")
@@ -196,5 +199,13 @@ class AnnealedGFN(SamplerModel):
 
         param_groups += [{"params": self.logZ, "lr": optimizer_cfg.lr_flow}]
         param_groups += [{"params": self.logZ_ratio, "lr": optimizer_cfg.lr_flow}]
+
+        if self.annealing_schedule is not None:
+            param_groups += [
+                {
+                    "params": self.annealing_schedule.parameters(),
+                    "lr": optimizer_cfg.lr_flow,
+                }
+            ]
 
         return param_groups
