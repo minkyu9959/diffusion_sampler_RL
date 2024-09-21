@@ -4,9 +4,24 @@ from .gfn_loss import (
     detailed_balance_loss,
     mle_loss,
     annealed_db,
-    GFNForwardLossWrapper,
-    GFNBackwardLossWrapper,
+    annealed_db_on_states,
+    annealed_subtb,
 )
+
+from .trajectory_loss import (
+    forward_tb,
+    backward_tb,
+    forward_vargrad,
+    backward_vargrad,
+    forward_db,
+    backward_db,
+    forward_annealed_db,
+    backward_annealed_db,
+    backward_mle,
+    forward_annealed_subtb,
+    backward_annealed_subtb,
+)
+
 from .pis import pis
 
 
@@ -25,16 +40,19 @@ def get_forward_loss(
     loss_fn(model, batch_size, exploration_schedule=None, return_experience=False)
     """
     if loss_type == "tb":
-        return GFNForwardLossWrapper(trajectory_balance_loss)
+        return forward_tb
 
     elif loss_type == "tb-avg":
-        return GFNForwardLossWrapper(vargrad_loss)
+        return forward_vargrad
 
     elif loss_type == "db":
-        return GFNForwardLossWrapper(detailed_balance_loss)
+        return forward_db
 
     elif loss_type == "annealed_db":
-        return GFNForwardLossWrapper(annealed_db)
+        return forward_annealed_db
+
+    elif loss_type == "annealed_subtb":
+        return forward_annealed_subtb
 
     elif loss_type == "pis":
         return pis
@@ -51,19 +69,22 @@ def get_backward_loss(loss_type: str) -> Callable[[SamplerModel, Tensor], Tensor
     """
 
     if loss_type == "tb":
-        return GFNBackwardLossWrapper(trajectory_balance_loss)
+        return backward_tb
 
     elif loss_type == "tb-avg":
-        return GFNBackwardLossWrapper(vargrad_loss)
+        return backward_vargrad
 
     elif loss_type == "annealed_db":
-        return GFNBackwardLossWrapper(annealed_db)
+        return backward_annealed_db
+
+    elif loss_type == "annealed_subtb":
+        return backward_annealed_subtb
 
     elif loss_type == "mle":
-        return GFNBackwardLossWrapper(mle_loss)
+        return backward_mle
 
     elif loss_type == "db":
-        return GFNBackwardLossWrapper(detailed_balance_loss)
+        return backward_db
 
     else:
         raise Exception("Invalid backward loss type")
