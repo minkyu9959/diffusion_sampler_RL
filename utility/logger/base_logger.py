@@ -1,5 +1,5 @@
 class Logger:
-    def log_loss(self, loss: dict):
+    def log_loss(self, loss: dict, epoch: int):
         raise NotImplementedError
 
     def log_visual(self, visuals: dict, epoch: int):

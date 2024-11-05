@@ -1,5 +1,5 @@
 
-_target_: energy.simple_energy.UniformEnergy
+_target_: task.energies.simple_energy.UniformEnergy
 
 dim: ${energy.dim}
 

@@ -1,5 +1,5 @@
 trainer:
-  _target_: trainer.simulation_free_trainer.SimulationFreeTrainer
+  _target_: sampler.gfn.trainer.simulation_free_trainer.SimulationFreeTrainer
 
 epochs: 25000
 

@@ -1,5 +1,5 @@
 trainer:
-  _target_: trainer.sequential_trainer.SequentialTrainer
+  _target_: sampler.gfn.trainer.sequential_trainer.SequentialTrainer
 
 defaults:
   - /train@subtrainer: OnPolicy

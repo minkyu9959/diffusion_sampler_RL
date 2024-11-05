@@ -1,4 +1,4 @@
-_target_: models.CMCDSampler
+_target_: sampler.gfn.models.CMCDSampler
 
 defaults:
   - components@state_encoder: StateEncoding
@@ -26,7 +26,7 @@ control_model:
 
 trajectory_length: 100
 
-base_diffusion_rate: 1.0
+base_std: 1.0
 
 clipping: true
 lgv_clip: 1e2

@@ -1,7 +1,7 @@
 import torch
 
-from trainer.buffer import *
-from energy import *
+from sampler.gfn.buffer import *
+from task import *
 
 energy_function = GMM25("cuda:0", dim=2)
 

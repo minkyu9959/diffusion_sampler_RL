@@ -1,5 +1,5 @@
 trainer:
-  _target_: trainer.trajectory_wise_trainer.OffPolicyTrainer
+  _target_: sampler.gfn.trainer.trajectory_wise_trainer.OffPolicyTrainer
 
 epochs: 25000
 batch_size: 300

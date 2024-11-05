@@ -1,11 +1,4 @@
-import hydra
-from omegaconf import DictConfig, OmegaConf
-
-
-def check_config_and_set_read_only(cfg: DictConfig):
-
-    # From now, config file cannot be modified.
-    OmegaConf.set_readonly(cfg, True)
+from omegaconf import DictConfig
 
 
 def get_trainer_name_from_config(cfg: DictConfig) -> str:

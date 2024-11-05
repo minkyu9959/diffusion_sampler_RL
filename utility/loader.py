@@ -6,23 +6,20 @@ from omegaconf import OmegaConf
 from hydra import compose, initialize_config_dir
 from hydra.utils import instantiate
 
-from .plot import SamplePlotter
 from .logger import get_logger
 from .seed import set_seed
 
-from models import get_model
-from trainer import BaseTrainer
+from sampler.gfn.trainer import BaseTrainer
 
-from energy import get_energy_function, get_energy_by_name
+from task import get_energy_by_name, Plotter
 
 
 CONFIG_PATH = "/home/guest_dyw/diffusion-sampler/configs"
 
 
 def load_energy_and_plotter(name: str, device: str = "cpu"):
-    """Load energy function and plotter."""
     energy = get_energy_by_name(name, device=device)
-    plotter = SamplePlotter(energy)
+    plotter = Plotter(energy)
 
     return energy, plotter
 
@@ -49,28 +46,34 @@ def load_energy_model_and_config(
     set_seed(cfg.seed)
 
     energy = get_energy_by_name(energy_name, device=cfg.device)
-    model = get_model(cfg, energy).to(cfg.device)
+
+    model = instantiate(
+        cfg.model,
+        device=cfg.device,
+        energy_function=energy,
+    ).to(cfg.device)
 
     return energy, model, cfg
 
 
-def load_all_from_experiment_path(
-    experiment_path: str, must_init_logger=False, name="ManyWell"
-):
+def load_all_from_experiment_path(experiment_path: str, must_init_logger=False):
     config_path = experiment_path + "/.hydra/config.yaml"
 
     cfg = OmegaConf.load(config_path)
 
     set_seed(cfg.seed)
 
-    energy = get_energy_function(cfg.energy, device=cfg.device)
-    energy.name = name
+    energy = get_energy_by_name(cfg.energy.name, device=cfg.device)
 
-    model = get_model(cfg, energy).to(cfg.device)
+    model = instantiate(
+        cfg.model,
+        device=cfg.device,
+        energy_function=energy,
+    ).to(cfg.device)
 
     model.load_state_dict(torch.load(experiment_path + "/model.pt"))
 
-    plotter = SamplePlotter(energy, **cfg.eval.plot)
+    plotter = Plotter(energy)
 
     if must_init_logger:
         logger = get_logger(cfg, "./eval/temp/result")

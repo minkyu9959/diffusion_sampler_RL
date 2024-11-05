@@ -1,4 +1,4 @@
-_target_: models.components.architectures.TimeEncoding
+_target_: sampler.gfn.models.components.architectures.TimeEncoding
 
 harmonics_dim: ${.t_emb_dim}
 

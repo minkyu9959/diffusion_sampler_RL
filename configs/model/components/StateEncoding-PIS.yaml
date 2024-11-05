@@ -1,4 +1,4 @@
-_target_: models.components.architectures.StateEncodingPIS
+_target_: sampler.gfn.models.components.architectures.StateEncodingPIS
 
 s_dim: ???
 

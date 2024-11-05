@@ -1,4 +1,4 @@
-_target_: models.components.architectures.JointPolicy
+_target_: sampler.gfn.models.components.architectures.JointPolicy
 
 s_dim: ???
 

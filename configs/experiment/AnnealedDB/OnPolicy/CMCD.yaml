@@ -5,7 +5,7 @@ defaults:
   - override /train: OnPolicy
 
 train:
-  fwd_loss: annealed_db
+  fwd_loss: adb
 
   exploratory: false
 

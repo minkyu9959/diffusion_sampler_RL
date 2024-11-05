@@ -1,4 +1,4 @@
-_target_: energy.simple_energy.GaussianEnergy
+_target_: task.energies.energies.simple_energy.GaussianEnergy
 
 dim: ${energy.dim}
 

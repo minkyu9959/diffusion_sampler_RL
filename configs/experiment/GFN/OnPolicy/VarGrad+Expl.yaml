@@ -1,13 +1,13 @@
 # @package _global_
 
 defaults:
-  - override /model: GFN-PIS
+  - override /model: GFN
   - override /train: OnPolicy
 
 model:
   t_scale: 1.0
 
-  backward_model: null
+  backward_policy: null
   langevin_scaler: null
   flow_model: null
 

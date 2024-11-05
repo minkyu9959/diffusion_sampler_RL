@@ -1,4 +1,4 @@
-_target_: models.DoubleGFN
+_target_: sampler.gfn.models.DoubleGFN
 
 defaults:
   - prior_energy: Gaussian

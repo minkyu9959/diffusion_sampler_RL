@@ -1,0 +1,16 @@
+# @package _global_
+
+defaults:
+  - override /model: GFN
+  - override /train: SampleBased
+
+model:
+  backward_policy: null
+  flow_model: null
+
+  langevin_scaler:
+    out_dim: ${energy.dim}
+
+train:
+  epochs: 10000
+  bwd_loss: mle

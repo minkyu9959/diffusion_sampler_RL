@@ -1,7 +1,7 @@
 import torch
 
-from models import *
-from energy import *
+from sampler.gfn.models import *
+from task import *
 
 from utility.loader import load_energy_model_and_config
 

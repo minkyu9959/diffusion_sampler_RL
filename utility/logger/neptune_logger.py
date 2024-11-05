@@ -1,5 +1,4 @@
 import neptune
-from neptune.utils import stringify_unsupported
 
 import sys
 import math
@@ -8,6 +7,7 @@ from typing import Union
 import matplotlib.pyplot as plt
 import torch
 
+from omegaconf import DictConfig, OmegaConf
 from .base_logger import Logger
 
 from configs.util import *
@@ -24,8 +24,8 @@ class NeptuneLogger(Logger):
         self.run = neptune.init_run(
             project="dywoo1247/Diffusion-sampler",
             tags=make_tag(cfg),
-            dependencies="infer",
             name=cfg.get("name"),
+            flush_period=100,
         )
 
         if group_tag := cfg.get("group_tag"):
@@ -42,14 +42,11 @@ class NeptuneLogger(Logger):
         cfg_dict.pop("name", None)
         cfg_dict.pop("group_tag", None)
 
-        plot_cfg = cfg_dict["eval"].get("plot", None)
-        cfg_dict["eval"].pop("plot", None)
-
         self.run["parameters"] = cfg_dict
-        self.run["parameters/eval/plot"] = stringify_unsupported(plot_cfg)
 
         self.run["scripts"] = "python3 " + " ".join(sys.argv)
         self.run["output_dir"] = output_dir
+
         self.run["trainer"] = get_trainer_name_from_config(cfg)
         self.run["model"] = get_model_name_from_config(cfg)
         self.run["energy"] = get_energy_name_from_config(cfg)
@@ -77,19 +74,16 @@ class NeptuneLogger(Logger):
 
     def log_model(self, model: torch.nn.Module, epoch: int, is_final: bool = False):
         final = "_final" if is_final else ""
-
         model_path = f"{self.output_dir}/model{final}.pt"
-
         torch.save(model.state_dict(), model_path)
-        self.run[f"model_ckpts/epoch_{epoch}"].upload(model_path)
 
     def log_gradient(self, model: torch.nn.Module, epoch: int):
         assert self.detail_log
 
         for name, param in model.named_parameters():
             if param.requires_grad and param.grad is not None:
-                self.run[f"gradient/{name}_mean"].append(
-                    param.grad.mean().detach().cpu().numpy(),
+                self.run[f"gradient/norm/{name}"].append(
+                    param.grad.norm().detach().cpu().numpy(),
                     step=epoch,
                 )
 
@@ -98,6 +92,6 @@ class NeptuneLogger(Logger):
                     step=epoch,
                 )
 
-    def __del__(self):
+    def finish(self):
         if hasattr(self, "run"):
             self.run.stop()

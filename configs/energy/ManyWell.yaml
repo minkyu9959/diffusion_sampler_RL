@@ -1,5 +1,2 @@
-# @package _global_
-
-energy:
-  name: "ManyWell"
-  dim: 32
+name: "ManyWell"
+dim: 32

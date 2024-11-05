@@ -1,5 +1,2 @@
-# @package _global_
-
-energy:
-  name: "LGCP"
-  dim: 1600
+name: "LGCP"
+dim: 1600

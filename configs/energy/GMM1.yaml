@@ -1,5 +1,0 @@
-# @package _global_
-
-energy:
-  name: "GMM1"
-  dim: 2

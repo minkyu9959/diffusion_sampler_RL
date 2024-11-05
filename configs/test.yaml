@@ -16,9 +16,6 @@ train:
 model:
   device: ${device}
 
-energy:
-  device: ${device}
-
 eval:
   eval_every_n_epoch: 100
   save_model_every_n_epoch: 1000

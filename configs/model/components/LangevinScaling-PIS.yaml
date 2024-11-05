@@ -1,4 +1,4 @@
-_target_: models.components.architectures.LangevinScalingModelPIS
+_target_: sampler.gfn.models.components.architectures.LangevinScalingModelPIS
 
 s_emb_dim: 64
 

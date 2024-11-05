@@ -1,4 +1,4 @@
-_target_: models.components.architectures.StateEncoding
+_target_: sampler.gfn.models.components.architectures.StateEncoding
 
 s_dim: ???
 # s_dim, sample space dimension is set in runtime.

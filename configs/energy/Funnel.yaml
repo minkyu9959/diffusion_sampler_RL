@@ -1,5 +1,2 @@
-# @package _global_
-
-energy:
-  name: "Funnel"
-  dim: 10
+name: "Funnel"
+dim: 10

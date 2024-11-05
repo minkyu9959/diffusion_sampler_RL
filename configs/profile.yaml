@@ -4,13 +4,10 @@ device: "cuda:0"
 
 defaults:
   - energy: ManyWell
-  - model: GFN-PIS
+  - model: GFN
   - _self_
 
 model:
-  device: ${device}
-
-energy:
   device: ${device}
 
 name: ???

@@ -1,11 +1,9 @@
-_target_: models.AnnealedGFN
+_target_: sampler.gfn.models.AnnealedGFN
 
 defaults:
   - components@state_encoder: StateEncoding
 
   - components@time_encoder: TimeEncoding
-
-  - components@flow_model: FlowModel-PIS
 
   - components@forward_policy: JointPolicy
 
@@ -14,8 +12,6 @@ defaults:
   - components@langevin_scaler: LangevinScaling
 
   - prior_energy: Gaussian
-
-  - optional override prior_energy: Gaussian-${energy}
 
 state_encoder:
   s_dim: ${energy.dim}
@@ -49,7 +45,7 @@ langevin_scaler:
   out_dim: ${energy.dim}
 
 annealing_schedule:
-  _target_: models.components.architectures.AnnealingSchedule
+  _target_: sampler.gfn.models.components.architectures.AnnealingSchedule
   annealing_step: ${model.annealing_step}
 
 clipping: true

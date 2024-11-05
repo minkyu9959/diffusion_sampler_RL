@@ -1,4 +1,4 @@
-_target_: models.components.architectures.FlowModelPIS
+_target_: sampler.gfn.models.components.architectures.FlowModelPIS
 
 s_emb_dim: 64
 

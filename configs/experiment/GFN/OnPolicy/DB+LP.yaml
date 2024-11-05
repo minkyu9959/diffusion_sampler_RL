@@ -1,11 +1,11 @@
 # @package _global_
 
 defaults:
-  - override /model: GFN-PIS
+  - override /model: GFN
   - override /train: OnPolicy
 
 model:
-  backward_model: null
+  backward_policy: null
 
 train:
   fwd_loss: db

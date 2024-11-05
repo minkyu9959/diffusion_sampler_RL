@@ -1,6 +1,5 @@
 import wandb
 
-import sys
 import math
 from typing import Union
 
@@ -87,6 +86,6 @@ class WandbLogger(Logger):
                     step=epoch,
                 )
 
-    def __del__(self):
+    def finish(self):
         if hasattr(self, "run"):
             wandb.finish()

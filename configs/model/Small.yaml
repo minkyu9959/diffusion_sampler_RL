@@ -1,0 +1,68 @@
+_target_: sampler.gfn.models.AnnealedGFN
+
+defaults:
+  - components@state_encoder: StateEncoding
+
+  - components@time_encoder: TimeEncoding
+
+  - components@flow_model: FlowModel-PIS
+
+  - components@forward_policy: JointPolicy
+
+  - components@backward_policy: JointPolicy
+
+  - components@langevin_scaler: LangevinScaling
+
+  - prior_energy: Gaussian
+
+  - optional override prior_energy: Gaussian-${energy}
+
+state_encoder:
+  s_dim: ${energy.dim}
+  s_emb_dim: 32
+
+time_encoder:
+  t_emb_dim: 32
+  harmonics_dim: ${.t_emb_dim}
+
+trajectory_length: 100
+annealing_step: ${.trajectory_length}
+
+forward_policy:
+  s_dim: ${energy.dim}
+  s_emb_dim: ${model.state_encoder.s_emb_dim}
+  t_dim: ${model.time_encoder.t_emb_dim}
+  hidden_dim: 64
+  num_layers: 2
+
+backward_policy:
+  s_dim: ${energy.dim}
+  s_emb_dim: ${model.state_encoder.s_emb_dim}
+  t_dim: ${model.time_encoder.t_emb_dim}
+  hidden_dim: ${model.forward_policy.hidden_dim}
+  num_layers: ${model.forward_policy.num_layers}
+
+langevin_scaler:
+  s_emb_dim: ${model.state_encoder.s_emb_dim}
+  t_dim: ${model.time_encoder.t_emb_dim}
+  hidden_dim: ${model.forward_policy.hidden_dim}
+  _partial_: true
+  out_dim: ${energy.dim}
+
+clipping: true
+lgv_clip: 1e2
+gfn_clip: 1e4
+
+learn_variance: false
+
+log_var_range: 4.0
+base_std: 1.0
+
+fixed_logZ_ratio: false
+
+optimizer_cfg:
+  lr_policy: 1e-3
+  lr_flow: 1e-1
+  weight_decay: 1e-7
+  use_weight_decay: false
+  max_grad_norm: null

@@ -1,13 +1,13 @@
-_target_: models.GFN
+_target_: sampler.gfn.models.GFN
 
 defaults:
   - components@state_encoder: StateEncoding
 
   - components@time_encoder: TimeEncoding
 
-  - components@forward_model: JointPolicy
+  - components@forward_policy: JointPolicy
 
-  - components@backward_model: JointPolicy
+  - components@backward_policy: JointPolicy
 
   - components@flow_model: FlowModel
 
@@ -15,15 +15,19 @@ defaults:
 
   - prior_energy: Dirac
 
-forward_model:
+forward_policy:
   s_dim: ${energy.dim}
   s_emb_dim: ${model.state_encoder.s_emb_dim}
   t_dim: ${model.time_encoder.t_emb_dim}
   hidden_dim: 256
   num_layers: 2
 
-backward_model:
+backward_policy:
   s_dim: ${energy.dim}
+  s_emb_dim: ${model.state_encoder.s_emb_dim}
+  t_dim: ${model.time_encoder.t_emb_dim}
+  hidden_dim: ${model.forward_policy.hidden_dim}
+  num_layers: ${model.forward_policy.num_layers}
 
 state_encoder:
   s_dim: ${energy.dim}
@@ -38,7 +42,7 @@ time_encoder:
 langevin_scaler:
   s_emb_dim: ${model.state_encoder.s_emb_dim}
   t_dim: ${model.time_encoder.t_emb_dim}
-  hidden_dim: ${model.forward_model.hidden_dim}
+  hidden_dim: ${model.forward_policy.hidden_dim}
   out_dim: ${energy.dim}
 
 trajectory_length: 100
@@ -53,9 +57,12 @@ clipping: true
 lgv_clip: 1e2
 gfn_clip: 1e4
 
+fixed_logZ: false
+
 optimizer_cfg:
   lr_policy: 1e-3
   lr_flow: 1e-1
   lr_back: 1e-3
   weight_decay: 1e-7
   use_weight_decay: false
+  max_grad_norm: null

@@ -1,5 +1,2 @@
-# @package _global_
-
-energy:
-  name: "GMM40"
-  dim: 2
+name: "GMM40"
+dim: 2

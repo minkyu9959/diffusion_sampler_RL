@@ -1,0 +1,17 @@
+# @package _global_
+
+defaults:
+  - override /model: AnnealedGFN
+  - override /train: OffPolicy
+
+train:
+  fwd_loss: adb
+  bwd_loss: adb
+
+  exploratory: true
+  exploration_factor: 0.1
+  exploration_wd: true
+
+  local_search: null
+
+  epochs: 10000

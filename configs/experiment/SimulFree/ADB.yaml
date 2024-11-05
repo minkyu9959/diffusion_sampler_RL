@@ -9,8 +9,8 @@ train:
 
   batch_size: 60000
 
-  # 600 * 100 * 10
-  buffer_size: 120000
+  # 600 * 1000 * 10
+  buffer_size: 6000000
 
   sample_interval: 10
   simulation_sample_size: 600

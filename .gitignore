@@ -2,7 +2,7 @@ __pycache__
 
 outputs
 wandb
-results
+results/*
 results_pis_architectures
 
 multirun
@@ -10,9 +10,7 @@ multirun
 eval
 scripts
 
-.neptune
-.env
-.vscode
+.*
 *.png
 *.gif
 *.mp4

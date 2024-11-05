@@ -1,4 +1,4 @@
-_target_: models.GFN
+_target_: sampler.gfn.models.GFN
 
 defaults:
   - components@state_encoder: StateEncoding-PIS

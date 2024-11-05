@@ -5,7 +5,7 @@ defaults:
   - override /train: OffPolicy
 
 model:
-  backward_model: null
+  backward_policy: null
   flow_model: null
 
   langevin_scaler:

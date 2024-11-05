@@ -3,9 +3,9 @@ seed: 12345
 device: "cuda:0"
 
 defaults:
+  - energy: ManyWell
   - model: GFN
   - train: OnPolicy
-  - energy: ManyWell
   - _self_
 
   # Experiments config file can override the default option.
@@ -19,9 +19,6 @@ train:
 model:
   device: ${device}
 
-energy:
-  device: ${device}
-
 eval:
   eval_every_n_epoch: 100
   save_model_every_n_epoch: 1000
@@ -32,8 +29,8 @@ eval:
 
 hydra:
   run:
-    dir: results/outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: /home/guest_dyw/diffusion-sampler/results/outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
   sweep: 
-    dir: results/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: /home/guest_dyw/diffusion-sampler/results/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
 logger: "neptune"
