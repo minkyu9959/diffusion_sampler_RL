@@ -52,7 +52,7 @@ def main(cfg: DictConfig) -> None:
     energy = get_energy_by_name(cfg.energy.name, device=cfg.device)
 
     output_dir = HydraConfig.get().runtime.output_dir
-    logger = get_logger(cfg, output_dir, debug=cfg.get("detail_log", False))
+    logger = get_logger(cfg, output_dir)
 
     train(cfg, energy, logger)
 

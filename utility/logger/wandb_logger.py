@@ -1,26 +1,24 @@
-import wandb
-
+import os
 import math
 from typing import Union
 
-import matplotlib.pyplot as plt
 import torch
+import matplotlib.pyplot as plt
+from omegaconf import DictConfig, OmegaConf
+
+import wandb
 
 from .base_logger import Logger
-
 from configs.util import *
 
 
 class WandbLogger(Logger):
     def __init__(
-        self, cfg: Union[dict, DictConfig], output_dir: str, debug: bool = False
+        self,
+        cfg: Union[dict, DictConfig],
+        output_dir: str,
     ):
-
-        # require more detailed log for debugging purpose
-        self.detail_log = debug
-
-        # neptune logger cannot accept OmegaConf object.
-        # Convert it to python dictionary.
+        # Convert OmegaConf object to python dictionary.
         if type(cfg) is DictConfig:
             cfg_dict = OmegaConf.to_container(cfg, resolve=True)
         else:
@@ -29,9 +27,12 @@ class WandbLogger(Logger):
         group = cfg_dict.pop("group", None)
         name = cfg_dict.pop("name", None)
 
+        # more detailed log for debugging purpose
+        self.detail_log = cfg_dict.get("debug", False)
+
         self.run = wandb.init(
-            project="Diffusion-sampler",
-            entity="dywoo1247",
+            project=os.environ["PROJECT_NAME"],
+            entity=os.environ["ENTITY"],
             tags=make_tag(cfg),
             name=name,
             group=group,
@@ -45,13 +46,12 @@ class WandbLogger(Logger):
 
     def log_loss(self, loss: dict, epoch: int):
         loss = {f"train/{k}": v for k, v in loss.items()}
-
         self.run.log(loss, step=epoch)
 
     def log_metric(self, metrics: dict, epoch: int):
-
+        # Replace inf and nan values with None, which wandb can handle gracefully
         metrics = {
-            f"eval/{k}": (v if not math.isinf(v) and not math.isnan(v) else 0.0)
+            f"eval/{k}": (v if not math.isinf(v) and not math.isnan(v) else None)
             for k, v in metrics.items()
         }
 
@@ -59,11 +59,16 @@ class WandbLogger(Logger):
 
     def log_visual(self, visuals: dict, epoch: int):
         for visual_name, fig in visuals.items():
-            fig.savefig(f"{self.output_dir}/{visual_name}.pdf", bbox_inches="tight")
+            fig.savefig(
+                f"{self.output_dir}/{visual_name}.png",
+                format="png",
+                bbox_inches="tight",
+                dpi=100,
+            )
 
             self.run.log({f"visuals/{visual_name}": wandb.Image(fig)}, step=epoch)
 
-        # Prevent too much plt objects from lasting
+        # Prevent too many plt objects from remaining open
         plt.close("all")
 
     def log_model(self, model: torch.nn.Module, epoch: int, is_final: bool = False):
@@ -79,10 +84,9 @@ class WandbLogger(Logger):
 
         for name, param in model.named_parameters():
             if param.requires_grad and param.grad is not None:
+                grad_norm = param.grad.norm().detach().cpu().numpy()
                 self.run.log(
-                    {
-                        f"gradient/{name}_max": param.grad.max().detach().cpu().numpy(),
-                    },
+                    {f"gradient/norm/{name}": grad_norm},
                     step=epoch,
                 )
 

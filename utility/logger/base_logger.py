@@ -10,3 +10,9 @@ class Logger:
 
     def log_model(self, model, epoch: int, is_final: bool = False):
         raise NotImplementedError
+
+    def log_gradient(self, model, epoch: int):
+        raise NotImplementedError
+
+    def finish(self):
+        raise NotImplementedError

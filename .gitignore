@@ -10,8 +10,12 @@ multirun
 eval
 scripts
 
+.env
 .*
 *.png
 *.gif
 *.mp4
 *.pt
+
+!.env.example
+!.gitignore

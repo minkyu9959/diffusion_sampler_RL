@@ -1,15 +1,14 @@
-import neptune
-
+import os
 import sys
 import math
 from typing import Union
 
-import matplotlib.pyplot as plt
 import torch
-
+import neptune
+import matplotlib.pyplot as plt
 from omegaconf import DictConfig, OmegaConf
-from .base_logger import Logger
 
+from .base_logger import Logger
 from configs.util import *
 
 
@@ -22,10 +21,9 @@ class NeptuneLogger(Logger):
         self.detail_log = debug
 
         self.run = neptune.init_run(
-            project="dywoo1247/Diffusion-sampler",
+            project=f"{os.environ['ENTITY']}/{os.environ['PROJECT_NAME']}",
             tags=make_tag(cfg),
             name=cfg.get("name"),
-            flush_period=100,
         )
 
         if group_tag := cfg.get("group_tag"):
@@ -65,11 +63,16 @@ class NeptuneLogger(Logger):
 
     def log_visual(self, visuals: dict, epoch: int):
         for visual_name, fig in visuals.items():
-            fig.savefig(f"{self.output_dir}/{visual_name}.pdf", bbox_inches="tight")
+            fig.savefig(
+                f"{self.output_dir}/{visual_name}.png",
+                format="png",
+                bbox_inches="tight",
+                dpi=100,
+            )
 
             self.run[f"visuals/{visual_name}"].append(fig, step=epoch)
 
-        # Prevent too much plt objects from lasting
+        # Prevent too many plt objects from remaining open
         plt.close("all")
 
     def log_model(self, model: torch.nn.Module, epoch: int, is_final: bool = False):
@@ -84,11 +87,6 @@ class NeptuneLogger(Logger):
             if param.requires_grad and param.grad is not None:
                 self.run[f"gradient/norm/{name}"].append(
                     param.grad.norm().detach().cpu().numpy(),
-                    step=epoch,
-                )
-
-                self.run[f"gradient/{name}_max"].append(
-                    param.grad.max().detach().cpu().numpy(),
                     step=epoch,
                 )
 

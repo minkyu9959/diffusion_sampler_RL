@@ -2,6 +2,12 @@ from .base_logger import Logger
 from .neptune_logger import NeptuneLogger
 from .wandb_logger import WandbLogger
 
+from dotenv import load_dotenv, find_dotenv
+
+# Load .env file to get environment variables
+# This is necessary to use environment variables in the logger code
+load_dotenv(find_dotenv(), override=True)
+
 
 class NullLogger(Logger):
     # do nothing logger
@@ -18,6 +24,9 @@ class NullLogger(Logger):
         pass
 
     def log_model(self, model, epoch: int, is_final: bool = False):
+        pass
+
+    def log_gradient(self, model, epoch: int):
         pass
 
     def finish(self):
