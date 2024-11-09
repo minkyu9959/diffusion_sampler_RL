@@ -14,7 +14,7 @@ model:
 
   # LP per dimension vs. Scalar LP
   langevin_scaler:
-    out_dim: 1
+    out_dim: ${energy.dim}
 
 train:
   epochs: 10000

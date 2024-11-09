@@ -1,0 +1,46 @@
+_target_: sampler.gfn.models.AISSampler
+
+defaults:
+  - components@state_encoder: StateEncoding
+
+  - components@time_encoder: TimeEncoding
+
+  - components@control_model: JointPolicy
+
+  - components@flow_model: FlowModel
+
+  - prior_energy: Gaussian
+
+state_encoder:
+  s_dim: ${energy.dim}
+  s_emb_dim: 128
+
+time_encoder:
+  t_emb_dim: 128
+  harmonics_dim: ${.t_emb_dim}
+
+control_model:
+  s_dim: ${energy.dim}
+  s_emb_dim: ${model.state_encoder.s_emb_dim}
+  t_dim: ${model.time_encoder.t_emb_dim}
+  hidden_dim: 256
+  num_layers: 2
+
+flow_model:
+  s_emb_dim: ${model.state_encoder.s_emb_dim}
+  t_dim: ${model.time_encoder.t_emb_dim}
+  hidden_dim: 1024
+
+trajectory_length: 100
+
+base_std: 1.0
+
+clipping: true
+lgv_clip: 1e2
+gfn_clip: 1e4
+
+optimizer_cfg:
+  lr_policy: 1e-3
+  lr_flow: 1e-2
+  weight_decay: 1e-7
+  use_weight_decay: true

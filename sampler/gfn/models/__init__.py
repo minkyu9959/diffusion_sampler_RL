@@ -4,6 +4,7 @@ from .cmcd import CMCDSampler
 from .gfn import GFN
 from .annealed_gfn import AnnealedGFN
 from .double_gfn import DoubleGFN
+from .BAIS import AISSampler
 
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "AnnealedGFN",
     "CMCDSampler",
     "DoubleGFN",
+    "AISSampler",
 ]

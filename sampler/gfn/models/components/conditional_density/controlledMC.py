@@ -88,3 +88,48 @@ class ControlledMCConditional(ConditionalDensity):
         logvar = logvar + np.log(self.dt)
 
         return {"mean": mean, "logvar": logvar}
+
+
+class MCConditional(ConditionalDensity):
+    """
+    Conditional density family using annealed score with control.
+    """
+
+    def __init__(
+        self,
+        dt: float,
+        sample_dim: int,
+        annealed_score_fn: Callable,
+        base_std: float = 1.0,
+        clipping: bool = False,
+        lgv_clip: float = 1e2,
+        gfn_clip: float = 1e4,
+    ):
+
+        self.sample_dim = sample_dim
+
+        self.dt = dt
+
+        self.annealed_score_fn = annealed_score_fn
+        self.base_std = base_std
+
+        self.clipping = clipping
+        self.lgv_clip = lgv_clip
+        self.gfn_clip = gfn_clip
+
+    def params(self, state: Tensor, time: float) -> dict:
+        mean = ((self.base_std**2) / 2) * self.annealed_score_fn(time, state)
+
+        if self.clipping:
+            mean = torch.clip(mean, -self.gfn_clip, self.gfn_clip)
+
+        # set the variance as constant.
+        logvar = torch.zeros_like(mean)
+        logvar = torch.full_like(logvar, np.log(self.base_std) * 2.0)
+
+        mean = mean * self.dt
+        mean = mean + state
+
+        logvar = logvar + np.log(self.dt)
+
+        return {"mean": mean, "logvar": logvar}

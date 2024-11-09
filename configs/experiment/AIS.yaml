@@ -1,0 +1,16 @@
+# @package _global_
+
+defaults:
+  - override /model: BAIS
+  - override /train: OnPolicy
+
+train:
+  fwd_loss: db
+
+  exploratory: false
+  exploration_factor: 0.1
+  exploration_wd: true
+
+  local_search: null
+
+  epochs: 10000
