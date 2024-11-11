@@ -1,4 +1,5 @@
 from .base_energy import BaseEnergy
+
 from .funnel import Funnel
 from .many_well import ManyWell, SymmetricManyWell
 from .gmm import (
@@ -7,7 +8,6 @@ from .gmm import (
     GMM25,
     GMM40,
     HighDimensionalGMM,
-    GMM25ScaledDown,
 )
 from .double_well import DoubleWellEnergy, DW4
 from .lennardjones import LennardJonesEnergy, LJ13, LJ55
@@ -37,17 +37,17 @@ def get_energy_by_name(name: str, device: str) -> BaseEnergy:
         case "GMM40":
             energy = GMM40(dim=2, device=device)
         case "MoG50":
-            energy = HighDimensionalGMM(dim=50, device=device, base_gmm=GMM25ScaledDown)
+            energy = HighDimensionalGMM(dim=50, device=device, base_gmm=GMM25)
         case "MoG200":
-            energy = HighDimensionalGMM(
-                dim=200, device=device, base_gmm=GMM25ScaledDown
-            )
+            energy = HighDimensionalGMM(dim=200, device=device, base_gmm=GMM25)
         case "DW4":
             energy = DW4(device=device)
         case "LJ13":
             energy = LJ13(device=device)
         case "LJ55":
             energy = LJ55(device=device)
+        case "AlanineDipeptide":
+            energy = AlanineDipeptide(temperature=300, shift_to_minimum=True)
         case "LGCP":
             energy = LGCP(device=device)
         case _:

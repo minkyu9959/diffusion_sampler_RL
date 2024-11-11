@@ -11,6 +11,7 @@ import torch
 import numpy as np
 
 import multiprocessing as mp
+from pathlib import Path
 
 from openmm.unit import kilojoule, mole, nanometer, kelvin, picosecond, femtosecond
 from openmm.app import AmberPrmtopFile, OBC1
@@ -18,10 +19,13 @@ from openmm.openmm import Context, LangevinIntegrator, Platform, System
 
 
 from ..base_energy import BaseEnergy
+from ..particle_system import interatomic_distance, remove_mean
 
 
 # Gas constant in kJ/(mol*K)
 R = 8.314e-3
+
+DATA_PATH = Path("task/energies/data/aldp")
 
 
 class AlanineDipeptide(BaseEnergy):
@@ -38,14 +42,27 @@ class AlanineDipeptide(BaseEnergy):
     # Not an exact sample, but from long MD simulation.
     can_sample = True
 
-    def __init__(self, temperature=300):
+    def __init__(self, temperature=300, shift_to_minimum=True):
         super().__init__(device="cpu", dim=66)
 
         self.temperature = temperature
-        self.kBT = R * 300
+        self.shift = shift_to_minimum
+        self.kBT = R * temperature
 
+        self.spatial_dim = 3
+        self.n_particles = 22
+
+        self._init_openmm_context()
+
+        self.minimum_energy_position = torch.load(
+            DATA_PATH / "min_energy_position.pt"
+        ).squeeze()
+
+        self.approx_sample = torch.load(DATA_PATH / "exact_sample.pt")
+
+    def _init_openmm_context(self):
         # Load the force field file (describing amber99)
-        param_topology = AmberPrmtopFile("task/energies/data/aldp/aldp.prmtop")
+        param_topology = AmberPrmtopFile(DATA_PATH / "aldp.prmtop")
 
         # Create the system (openmm System object)
         self.system: System = param_topology.createSystem(
@@ -64,13 +81,17 @@ class AlanineDipeptide(BaseEnergy):
             Platform.getPlatformByName("CUDA"),
         )
 
-        # self.minimum_energy_positions = np.load()
-
     def energy(self, x: torch.Tensor):
+        if self.shift:
+            x = x + self.minimum_energy_position
+
         energy = self.energy_and_force(x.detach().cpu())[0]
         return energy.to(x.device)
 
     def score(self, x: torch.Tensor):
+        if self.shift:
+            x = x + self.minimum_energy_position
+
         force = self.energy_and_force(x.detach().cpu())[1]
         return -force.to(x.device)
 
@@ -97,7 +118,13 @@ class AlanineDipeptide(BaseEnergy):
         return batch_energy, batch_force
 
     def _generate_sample(self, batch_size: int) -> torch.Tensor:
-        raise NotImplementedError("TODO")
+        return self.approx_sample[torch.randperm(batch_size)]
+
+    def remove_mean(self, x):
+        return remove_mean(x, self.n_particles, self.spatial_dim)
+
+    def interatomic_distance(self, x):
+        return interatomic_distance(x, self.n_particles, self.spatial_dim)
 
 
 class AlanineDipeptideMP(BaseEnergy):
@@ -116,7 +143,7 @@ class AlanineDipeptideMP(BaseEnergy):
         self.temperature = temperature
 
         # Load the force field file (describing amber99)
-        param_topology = AmberPrmtopFile("task/energies/data/aldp/aldp.prmtop")
+        param_topology = AmberPrmtopFile(DATA_PATH / "aldp.prmtop")
 
         # Create the system (openmm System object)
         system: System = param_topology.createSystem(

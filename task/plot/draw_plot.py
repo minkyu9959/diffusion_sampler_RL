@@ -13,42 +13,39 @@ import seaborn as sns
 
 
 def get_points_on_2D_grid(
-    bounds: tuple, grid_width_n_points: int, device: Optional[str] = "cpu"
+    bounds: tuple, grid_width: int, device: Optional[str] = "cpu"
 ):
     """
-    For points on the grid
-    (bounds[0], bounds[1]) x (bounds[2], bounds[3])
-    with n points at each side,
-    make the list of points on the grid whose shape are (n**2, 2).
+    Generate a list of points on a 2D grid defined by the given bounds.
+    The grid will have grid_width points along each axis,
+    resulting in a total of (grid_width ** 2) points.
     """
 
     x_lower_lim, x_upper_lim, y_lower_lim, y_upper_lim = bounds
 
-    x = torch.linspace(x_lower_lim, x_upper_lim, grid_width_n_points, device=device)
-    y = torch.linspace(y_lower_lim, y_upper_lim, grid_width_n_points, device=device)
+    x = torch.linspace(x_lower_lim, x_upper_lim, grid_width, device=device)
+    y = torch.linspace(y_lower_lim, y_upper_lim, grid_width, device=device)
 
     points = torch.cartesian_prod(x, y)
     return points
 
 
-def make_2D_meshgrid(bounds: tuple, grid_width_n_points: int):
+def make_2D_meshgrid(bounds: tuple, grid_width: int):
     """
-    For points on the grid
-    (bounds[0], bounds[1]) x (bounds[2], bounds[3])
-    with n points at each side,
-    make meshgrid tensor X, Y whose shape are (n, n).
+    Create a meshgrid tensor X, Y with shape (n, n) for points on the grid
+    defined by (bounds[0], bounds[1]) x (bounds[2], bounds[3]) with n points on each side.
     """
     x_lower_lim, x_upper_lim, y_lower_lim, y_upper_lim = bounds
 
     x = torch.linspace(
         x_lower_lim,
         x_upper_lim,
-        grid_width_n_points,
+        grid_width,
     )
     y = torch.linspace(
         y_lower_lim,
         y_upper_lim,
-        grid_width_n_points,
+        grid_width,
     )
 
     return torch.meshgrid(x, y, indexing="ij")
@@ -56,48 +53,44 @@ def make_2D_meshgrid(bounds: tuple, grid_width_n_points: int):
 
 def draw_2D_contour(
     ax: Axes,
-    log_prob_func: Callable[[torch.Tensor], torch.Tensor],
+    func: Callable[[torch.Tensor], torch.Tensor],
     plotting_bounds: tuple,
-    grid_width_n_points: int = 200,
+    grid_width: int = 200,
     n_contour_levels: int = 50,
-    log_prob_min: float = -1000.0,
+    func_min_value: float = -1000.0,
     fill_color: bool = False,
     device: str = "cpu",
 ):
     """
-    Plot contours of a log_prob func that is defined on 2D.
+    Plot contours of a func that is defined on 2D.
     This function returns contour object.
 
     :Args:
-        device (str): device which log_prob_func resides on.
+        device (str): device which function resides on.
     """
 
     points = get_points_on_2D_grid(
-        bounds=plotting_bounds, grid_width_n_points=grid_width_n_points, device=device
+        bounds=plotting_bounds, grid_width=grid_width, device=device
     )
 
     assert points.ndim == 2 and points.shape[1] == 2
 
-    log_prob_x = log_prob_func(points).detach().cpu()
+    z = func(points).detach().cpu()
+    z = torch.clamp_min(z, func_min_value)
+    z = z.reshape((grid_width, grid_width))
 
-    log_prob_x = torch.clamp_min(log_prob_x, log_prob_min)
-
-    log_prob_x = log_prob_x.reshape((grid_width_n_points, grid_width_n_points))
-
-    X, Y = make_2D_meshgrid(
-        bounds=plotting_bounds, grid_width_n_points=grid_width_n_points
-    )
+    X, Y = make_2D_meshgrid(bounds=plotting_bounds, grid_width=grid_width)
 
     if fill_color:
         # Fill the regions outside the contour levels with a dark color
         contour = ax.contourf(
             X,
             Y,
-            log_prob_x,
+            z,
             levels=n_contour_levels,
         )
     else:
-        contour = ax.contour(X, Y, log_prob_x, levels=n_contour_levels)
+        contour = ax.contour(X, Y, z, levels=n_contour_levels)
 
     ax.set_xlim(plotting_bounds[0], plotting_bounds[1])
     ax.set_ylim(plotting_bounds[2], plotting_bounds[3])
@@ -106,8 +99,8 @@ def draw_2D_contour(
 
 
 def draw_2D_sample(
-    sample: torch.Tensor,
     ax: Axes,
+    sample: torch.Tensor,
     plotting_bounds: tuple,
     alpha: float = 0.5,
     marker="o",
@@ -128,15 +121,20 @@ def draw_2D_sample(
 
 def draw_2D_kde(sample: torch.Tensor, ax: Axes, plotting_bounds: tuple):
     sample = sample.cpu().detach()
-    return sns.kdeplot(
-        x=sample[:, 0],
-        y=sample[:, 1],
-        cmap="Blues",
-        fill=True,
-        ax=ax,
-        clip=plotting_bounds,
-        warn_singular=False,
-    )
+    try:
+        return sns.kdeplot(
+            x=sample[:, 0],
+            y=sample[:, 1],
+            cmap="Blues",
+            fill=True,
+            ax=ax,
+            clip=plotting_bounds,
+            warn_singular=False,
+        )
+    except ValueError as e:
+        # If the KDE plot fails, return None
+        print(f"Error in kdeplot: {e}")
+        return None
 
 
 def draw_time_logZ_plot(
@@ -187,18 +185,18 @@ def draw_vector_field(
     vecfield: Callable[[torch.Tensor], torch.Tensor],
     device: str,
     plotting_bounds: tuple,
-    grid_width_n_points: int,
+    grid_width: int,
 ):
     """
     Draw vector field quiver plot on 2D plot.
     Here, given vf must be batch-support version.
     """
 
-    X, Y = make_2D_meshgrid(plotting_bounds, grid_width_n_points // 20)
+    X, Y = make_2D_meshgrid(plotting_bounds, grid_width)
 
     points = get_points_on_2D_grid(
         plotting_bounds,
-        grid_width_n_points // 20,
+        grid_width,
         device=device,
     )
 

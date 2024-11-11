@@ -7,10 +7,11 @@ from matplotlib.axes import Axes
 from matplotlib.animation import FuncAnimation
 
 from .draw_plot import *
-from .plot_config import CONFIG_FOR_ENERGY, DEFAULT_CONFIG
+from .plot_config import CONFIG_FOR_ENERGY
 from .projection import Projector
 
 from ..energies import BaseEnergy, AnnealedDensities
+
 from omegaconf import OmegaConf, DictConfig
 
 
@@ -18,35 +19,39 @@ class Plotter:
     def __init__(
         self,
         energy: BaseEnergy,
-        **kwargs: dict,
+        **override_cfg: dict,
     ):
         self.energy = energy
 
+        self._load_plot_config(energy.name, override_cfg)
+
+        self._check_plot_availability()
+
+        if energy.data_ndim > 2 and (self.can_plot_sample or self.can_plot_kde):
+            self._init_projector()
+            self.need_projection = True
+        else:
+            self.need_projection = False
+
+    def _load_plot_config(self, energy_name: str, additional_config: dict):
         self.cfg: DictConfig = OmegaConf.merge(
-            DEFAULT_CONFIG, CONFIG_FOR_ENERGY[energy.name], OmegaConf.create(kwargs)
+            CONFIG_FOR_ENERGY[energy_name],
+            OmegaConf.create(additional_config),
         )
         OmegaConf.resolve(self.cfg)
 
-        # check the plot availability
+    def _check_plot_availability(self):
         self.can_plot_sample = bool(self.cfg.get("sample_figure"))
         self.can_plot_kde = bool(self.cfg.get("kde_figure"))
         self.can_plot_energy_hist = bool(self.cfg.get("energy_hist"))
         self.can_plot_interatomic_dist_hist = bool(self.cfg.get("interatomic_dist"))
 
-        # make projection of high dimensional energy
-        self.need_projection = energy.data_ndim > 2 and (
-            self.can_plot_sample or self.can_plot_kde
-        )
-
-        if self.need_projection:
-
-            # check invalid config
-            if "projection_dims" not in self.cfg.sample_figure:
-                raise Exception(
-                    "Please provide projection_dims for high dimensional energy"
-                )
-
-            self.projector = Projector(energy)
+    def _init_projector(self):
+        if "projection_dims" not in self.cfg.sample_figure:
+            raise Exception(
+                "Please provide projection_dims for high dimensional energy"
+            )
+        self.projector = Projector(self.energy)
 
     def contour_plot(
         self,
@@ -56,17 +61,17 @@ class Plotter:
     ):
         if self.need_projection:
 
-            def log_reward(x: torch.Tensor) -> torch.Tensor:
+            def func(x: torch.Tensor) -> torch.Tensor:
                 return -self.projector.energy_on_2d(x, first_dim, second_dim)
 
         else:
 
-            def log_reward(x: torch.Tensor) -> torch.Tensor:
+            def func(x: torch.Tensor) -> torch.Tensor:
                 return -self.energy.energy(x)
 
         return draw_2D_contour(
             ax,
-            log_prob_func=log_reward,
+            func=func,
             device=self.energy.device,
             **OmegaConf.to_container(self.cfg.contour_plot),
         )
@@ -92,7 +97,7 @@ class Plotter:
             sample = self.projector.projection(sample, first_dim, second_dim)
 
         return draw_2D_sample(
-            sample, ax, **OmegaConf.to_container(self.cfg.sample_plot)
+            ax, sample, **OmegaConf.to_container(self.cfg.sample_plot)
         )
 
     def kde_plot(
@@ -290,7 +295,8 @@ class Plotter:
     def make_interatomic_distance_histogram(self, sample: torch.Tensor, name: str = ""):
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
 
-        interatomic_dist = self.energy.interatomic_dist(sample).reshape(-1)
+        interatomic_dist = self.energy.interatomic_distance(sample).reshape(-1)
+
         draw_interatomic_dist_histogram(
             ax,
             interatomic_dist,

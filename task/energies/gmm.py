@@ -121,26 +121,6 @@ class GMM9(GaussianMixture):
         )
 
 
-class GMM25ScaledDown(GaussianMixture):
-    def __init__(self, device: str, dim: int, scale: float = 3e-3):
-
-        mode_list = torch.tensor(
-            [
-                (a, b)
-                for a in [-0.1, -0.05, 0.0, 0.05, 0.1]
-                for b in [-0.1, -0.05, 0.0, 0.05, 0.1]
-            ],
-            device=device,
-        )
-
-        super().__init__(
-            device=device,
-            mode_list=mode_list,
-            dim=dim,
-            scale=scale,
-        )
-
-
 class GMM25(GaussianMixture):
     def __init__(self, device: str, dim: int, scale: float = 0.3):
 

@@ -5,7 +5,6 @@ from .plot_config import *
 __all__ = [
     "Plotter",
     "CONFIG_FOR_ENERGY",
-    "DEFAULT_CONFIG",
     "draw_2D_contour",
     "draw_2D_sample",
     "draw_2D_kde",
