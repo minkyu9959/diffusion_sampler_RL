@@ -12,9 +12,10 @@ from .seed import set_seed
 from sampler.gfn.trainer import BaseTrainer
 
 from task import get_energy_by_name, Plotter
+from .path import BASE_PATH
 
 
-CONFIG_PATH = "/home/guest_dyw/diffusion-sampler/configs"
+CONFIG_PATH = BASE_PATH / "configs"
 
 
 def load_energy_and_plotter(name: str, device: str = "cpu"):

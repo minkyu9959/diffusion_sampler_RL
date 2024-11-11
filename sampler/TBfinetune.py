@@ -3,7 +3,7 @@ import torch
 from utility.loader import load_all_from_experiment_path
 
 
-PATH = "/home/guest_dyw/diffusion-sampler/results/outputs/2024-10-08/10-16-33"
+PATH = "results/outputs/2024-10-08/10-16-33"
 
 
 def main() -> None:
