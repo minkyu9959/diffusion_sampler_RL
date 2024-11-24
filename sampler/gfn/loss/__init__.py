@@ -25,6 +25,7 @@ from .trajectory_loss import (
 )
 
 from .pis import pis
+from .jarzynski import jarzynski_reverse_KL
 
 
 from ..models import SamplerModel
@@ -61,6 +62,9 @@ def get_forward_loss(
 
     elif loss_type == "pis":
         return pis
+    
+    elif loss_type == "jarzynski":
+        return jarzynski_reverse_KL
 
     else:
         raise Exception("Invalid forward loss type")

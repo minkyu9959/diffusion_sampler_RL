@@ -10,7 +10,7 @@ from task import BaseEnergy, AnnealedDensities
 from .base_model import SamplerModel
 
 from .components.architectures import *
-from .components.conditional_density import ControlledMCConditional
+from .components.conditional_density import ControlledMCConditional, MCConditional
 
 
 class CMCDSampler(SamplerModel):
@@ -59,6 +59,16 @@ class CMCDSampler(SamplerModel):
             lgv_clip=lgv_clip,
             gfn_clip=gfn_clip,
         )
+        
+        # self.backward_conditional = MCConditional(
+        #     dt=self.dt,
+        #     sample_dim=self.sample_dim,
+        #     annealed_score_fn=self.annealed_energy.score,
+        #     base_std=base_std,
+        #     clipping=clipping,
+        #     lgv_clip=lgv_clip,
+        #     gfn_clip=gfn_clip,
+        # )  
 
         self.backward_conditional = ControlledMCConditional(
             dt=self.dt,
@@ -73,6 +83,7 @@ class CMCDSampler(SamplerModel):
             lgv_clip=lgv_clip,
             gfn_clip=gfn_clip,
         )
+
 
         # log Z ratio estimator (This one only used in annealed-GFN)
         self.logZ_ratio = torch.nn.Parameter(

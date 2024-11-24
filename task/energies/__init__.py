@@ -4,6 +4,7 @@ from .funnel import Funnel
 from .many_well import ManyWell, SymmetricManyWell
 from .gmm import (
     GaussianMixture,
+    GMM1,
     GMM9,
     GMM25,
     GMM40,
@@ -30,6 +31,8 @@ def get_energy_by_name(name: str, device: str) -> BaseEnergy:
             energy = ManyWell(dim=128, device=device)
         case "ManyWell512":
             energy = ManyWell(dim=512, device=device)
+        case "GMM1":
+            energy = GMM1(dim=2, device=device)
         case "GMM9":
             energy = GMM9(dim=2, device=device)
         case "GMM25":

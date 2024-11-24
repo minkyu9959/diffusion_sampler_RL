@@ -29,7 +29,7 @@ class LearnedDiffusionConditional(ConditionalDensity):
         time_encoder: torch.nn.Module,
         joint_policy: torch.nn.Module,
         langevin_scaler: Optional[torch.nn.Module] = None,
-        score_fn=None,
+        score_fn = None,
         clipping: bool = False,
         lgv_clip: float = 1e2,
         gfn_clip: float = 1e4,

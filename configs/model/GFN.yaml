@@ -13,7 +13,7 @@ defaults:
 
   - components@langevin_scaler: LangevinScaling
 
-  - prior_energy: Dirac
+  - prior_energy: Gaussian # hey prior energy modified
 
 forward_policy:
   s_dim: ${energy.dim}

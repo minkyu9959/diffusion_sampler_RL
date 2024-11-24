@@ -1,4 +1,4 @@
 from .interface import ConditionalDensity
 from .diffusion import LearnedDiffusionConditional, LearnedAnnealedDiffusionConditional
 from .brownian import BrownianConditional, CorrectedBrownianConditional
-from .controlledMC import ControlledMCConditional, MCConditional
+from .controlledMC import ControlledMCConditional, MCConditional, BackwardMCConditional

@@ -11,12 +11,12 @@ class GaussianEnergy(BaseEnergy):
     logZ_is_available = True
     can_sample: bool = True
 
-    def __init__(
+    def __init__( 
         self,
         device,
         dim: int,
-        std: float = 1.0,
-    ):
+        std: float = 1.0, 
+    ): #Modify : std: float = 1e-3 (like Dirac Delta)
         super().__init__(device, dim)
 
         self.std = std

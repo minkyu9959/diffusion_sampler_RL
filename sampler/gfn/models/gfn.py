@@ -16,7 +16,10 @@ from .components.conditional_density import (
     LearnedDiffusionConditional,
     BrownianConditional,
     CorrectedBrownianConditional,
+    ControlledMCConditional,
+    BackwardMCConditional,
 )
+from task.energies.annealed_energy import AnnealedDensities
 
 
 class GFN(SamplerModel):
@@ -53,6 +56,7 @@ class GFN(SamplerModel):
         )
 
         self.prior_energy = prior_energy
+        self.annealed_energy = AnnealedDensities(energy_function, prior_energy)
 
         self.is_dirac_prior = type(prior_energy) == DiracDeltaEnergy
 
@@ -67,33 +71,59 @@ class GFN(SamplerModel):
             self.langevin_parametrization = True
 
         # These two model predict the mean and variance of Gaussian density.
-        forward_conditional = LearnedDiffusionConditional(
-            self.sample_dim,
-            self.dt,
-            state_encoder,
-            time_encoder,
-            forward_policy,
-            langevin_scaler=langevin_scaler,
-            score_fn=self.energy_function.score,
+        
+        # forward_conditional = LearnedDiffusionConditional(
+        #     self.sample_dim,
+        #     self.dt,
+        #     state_encoder,
+        #     time_encoder,
+        #     forward_policy,
+        #     langevin_scaler=langevin_scaler,
+        #     score_fn=self.energy_function.score, 
+        #     clipping=clipping,
+        #     lgv_clip=lgv_clip,
+        #     gfn_clip=gfn_clip,
+        #     learn_variance=learned_variance,
+        #     log_var_range=log_var_range,
+        #     base_std=np.sqrt(t_scale),
+        # )
+        
+        forward_conditional = ControlledMCConditional(
+            dt=self.dt,
+            sample_dim=self.sample_dim,
+            state_encoder=self.state_encoder,
+            time_encoder=self.time_encoder,
+            control_model=self.forward_policy,
+            do_control_plus_score=True,
+            annealed_score_fn=self.annealed_energy.score,
+            base_std=np.sqrt(t_scale),
             clipping=clipping,
             lgv_clip=lgv_clip,
             gfn_clip=gfn_clip,
-            learn_variance=learned_variance,
-            log_var_range=log_var_range,
-            base_std=np.sqrt(t_scale),
         )
-
-        if backward_policy is None:
-            backward_conditional = BrownianConditional(self.dt, np.sqrt(t_scale))
-        else:
-            backward_conditional = CorrectedBrownianConditional(
-                self.dt,
-                state_encoder,
-                time_encoder,
-                backward_policy,
-                base_std=np.sqrt(t_scale),
-                mean_var_range=pb_scale_range,
-            )
+               
+        backward_conditional = BackwardMCConditional(
+            dt=self.dt,
+            sample_dim=self.sample_dim,
+            annealed_score_fn=self.annealed_energy.score,
+            base_std=np.sqrt(t_scale),
+            clipping=clipping,
+            lgv_clip=lgv_clip,
+            gfn_clip=gfn_clip,
+        )       
+                
+        # if backward_policy is None:
+        #     backward_conditional = BrownianConditional(self.dt, np.sqrt(t_scale))
+            
+        # else:
+        #     backward_conditional = CorrectedBrownianConditional(
+        #         self.dt,
+        #         state_encoder,
+        #         time_encoder,
+        #         backward_policy,
+        #         base_std=np.sqrt(t_scale),
+        #         mean_var_range=pb_scale_range,
+        #     )
 
         self.set_conditional_density(
             forward_conditional=forward_conditional,

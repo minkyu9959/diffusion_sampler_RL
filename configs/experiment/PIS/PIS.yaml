@@ -13,6 +13,6 @@ model:
   flow_model: null
 
 train:
-  fwd_loss: pis
+  fwd_loss: vae
 
   exploratory: false

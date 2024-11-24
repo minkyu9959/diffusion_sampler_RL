@@ -92,7 +92,7 @@ class ControlledMCConditional(ConditionalDensity):
 
 class MCConditional(ConditionalDensity):
     """
-    Conditional density family using annealed score with control.
+    Conditional density family using annealed score without control.
     """
 
     def __init__(
